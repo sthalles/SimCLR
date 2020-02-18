@@ -11,9 +11,10 @@ from torch.utils.tensorboard import SummaryWriter
 from model import Encoder
 from utils import GaussianBlur
 
-batch_size = 64
-out_dim = 64
+batch_size = 3
+out_dim = 4
 s = 1
+temperature = 0.5
 
 color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
 
@@ -25,7 +26,7 @@ data_augment = transforms.Compose([transforms.ToPILImage(),
                                    GaussianBlur(),
                                    transforms.ToTensor()])
 
-train_dataset = datasets.STL10('data', split='train+unlabeled', download=True, transform=transforms.ToTensor())
+train_dataset = datasets.STL10('data', split='train', download=True, transform=transforms.ToTensor())
 train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, drop_last=True, shuffle=True)
 
 model = Encoder(out_dim=out_dim)
@@ -41,6 +42,8 @@ criterion = torch.nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), 3e-4)
 
 train_writer = SummaryWriter()
+
+similarity = torch.nn.CosineSimilarity(dim=1)
 
 n_iter = 0
 for e in range(40):
@@ -79,7 +82,11 @@ for e in range(40):
         # print(hjs.shape, zjs.shape)
 
         # positive pairs
-        l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
+        # l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
+        l_pos = similarity(zis.view(batch_size, out_dim), zjs.view(batch_size, out_dim)).view(batch_size,
+                                                                                              1) / temperature
+
+
         assert l_pos.shape == (batch_size, 1)  # [N,1]
         l_neg = []
 
@@ -87,9 +94,12 @@ for e in range(40):
             mask = np.ones(zjs.shape[0], dtype=bool)
             mask[i] = False
             negs = torch.cat([zjs[mask], zis[mask]], dim=0)  # [2*(N-1), C]
-            l_neg.append(torch.mm(zis[i].view(1, zis.shape[-1]), negs.permute(1, 0)))
+            # l_neg.append(torch.mm(zis[i].view(1, zis.shape[-1]), negs.permute(1, 0)))
+            l_neg.append(similarity(zis[i].view(1, zis.shape[-1]), negs).flatten())
 
-        l_neg = torch.cat(l_neg)  # [N, 2*(N-1)]
+        l_neg = torch.stack(l_neg)  # [N, 2*(N-1)]
+        l_neg /= temperature
+
         assert l_neg.shape == (batch_size, 2 * (batch_size - 1)), "Shape of negatives not expected." + str(l_neg.shape)
         # print("l_neg.shape -->", l_neg.shape)
 
