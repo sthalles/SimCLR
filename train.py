@@ -59,7 +59,6 @@ for e in range(40):
             xis.append(data_augment(batch_x[k]))
             xjs.append(data_augment(batch_x[k]))
 
-        # fig, axs = plt.subplots(nrows=1, ncols=6, constrained_layout=False)
         # fig, axs = plt.subplots(nrows=3, ncols=2, constrained_layout=False)
         # for i_ in range(3):
         #     axs[i_, 0].imshow(xis[i_].permute(1, 2, 0))
