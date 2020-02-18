@@ -44,8 +44,15 @@ optimizer = optim.Adam(model.parameters(), 3e-4)
 
 train_writer = SummaryWriter()
 
-similarity = torch.nn.CosineSimilarity(dim=1)
-# similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
+similarity_dim1 = torch.nn.CosineSimilarity(dim=1)
+similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
+
+# This mask can only be created once
+# Mask to remove positive examples from the batch of negative samples
+# negative_mask = torch.ones((batch_size, 2*batch_size), dtype=bool)
+# for i in range(batch_size):
+#     negative_mask[i, i] = 0
+#     negative_mask[i, i + batch_size] = 0
 
 n_iter = 0
 for e in range(40):
@@ -90,9 +97,8 @@ for e in range(40):
 
         # positive pairs
         # l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
-        l_pos = similarity(zis.view(batch_size, out_dim), zjs.view(batch_size, out_dim)).view(batch_size,
-                                                                                              1) / temperature
-
+        l_pos = similarity_dim1(zis.view(batch_size, out_dim), zjs.view(batch_size, out_dim)).view(batch_size,
+                                                                                                   1) / temperature
 
         assert l_pos.shape == (batch_size, 1)  # [N,1]
         l_neg = []
@@ -108,7 +114,7 @@ for e in range(40):
             mask[i] = False
             negs = torch.cat([zjs[mask], zis[mask]], dim=0)  # [2*(N-1), C]
             # l_neg.append(torch.mm(zis[i].view(1, zis.shape[-1]), negs.permute(1, 0)))
-            l_neg.append(similarity(zis[i].view(1, zis.shape[-1]), negs).flatten())
+            l_neg.append(similarity_dim1(zis[i].view(1, zis.shape[-1]), negs).flatten())
 
         l_neg = torch.stack(l_neg)  # [N, 2*(N-1)]
         l_neg /= temperature
@@ -118,15 +124,9 @@ for e in range(40):
 
         #############
         #############
-        # l_negs = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives.view(1, 6, out_dim))
-        #
-        # This mask can only be created once
-        # mask = torch.ones_like(l_negs, dtype=bool)
-        # for i in range(l_negs.shape[0]):
-        #     mask[i, i] = 0
-        #     mask[i, i + l_negs.shape[0]] = 0
-        #
-        # l_negs = l_negs[mask].view(l_negs.shape[0], -1)
+        # l_negs = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives.view(1, (2*batch_size), out_dim))
+        # l_negs = l_negs[negative_mask].view(l_negs.shape[0], -1)
+        # l_negs /= temperature
         #############
         #############
 
