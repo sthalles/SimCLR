@@ -16,6 +16,7 @@ batch_size = 3
 out_dim = 4
 s = 1
 temperature = 0.5
+use_cosine_similarity = True
 
 color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
 
@@ -44,11 +45,12 @@ optimizer = optim.Adam(model.parameters(), 3e-4)
 
 train_writer = SummaryWriter()
 
-similarity_dim1 = torch.nn.CosineSimilarity(dim=1)
-similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
+if use_cosine_similarity:
+    similarity_dim1 = torch.nn.CosineSimilarity(dim=1)
+    similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
 
-# This mask can only be created once
-# Mask to remove positive examples from the batch of negative samples
+# # This mask can only be created once
+# # Mask to remove positive examples from the batch of negative samples
 # negative_mask = torch.ones((batch_size, 2*batch_size), dtype=bool)
 # for i in range(batch_size):
 #     negative_mask[i, i] = 0
@@ -92,13 +94,16 @@ for e in range(40):
         # normalize projection feature vectors
         zis = F.normalize(zis, dim=1)
         zjs = F.normalize(zjs, dim=1)
-        assert zis.shape == (batch_size, out_dim), "Shape not expected."
-        assert zis.shape == (batch_size, out_dim), "Shape not expected."
+        assert zis.shape == (batch_size, out_dim), "Shape not expected: " + str(zis.shape)
+        assert zjs.shape == (batch_size, out_dim), "Shape not expected: " + str(zjs.shape)
 
         # positive pairs
-        # l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
-        l_pos = similarity_dim1(zis.view(batch_size, out_dim), zjs.view(batch_size, out_dim)).view(batch_size,
-                                                                                                   1) / temperature
+        if use_cosine_similarity:
+            l_pos = similarity_dim1(zis.view(batch_size, out_dim), zjs.view(batch_size, out_dim)).view(batch_size, 1)
+        else:
+            l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
+
+        l_pos /= temperature
 
         assert l_pos.shape == (batch_size, 1)  # [N,1]
         l_neg = []
@@ -113,8 +118,12 @@ for e in range(40):
             mask = np.ones(zjs.shape[0], dtype=bool)
             mask[i] = False
             negs = torch.cat([zjs[mask], zis[mask]], dim=0)  # [2*(N-1), C]
-            # l_neg.append(torch.mm(zis[i].view(1, zis.shape[-1]), negs.permute(1, 0)))
-            l_neg.append(similarity_dim1(zis[i].view(1, zis.shape[-1]), negs).flatten())
+
+            if use_cosine_similarity:
+                l_neg.append(similarity_dim1(zis[i].view(1, zis.shape[-1]), negs).flatten())
+            else:
+                l_neg.append(torch.mm(zis[i].view(1, zis.shape[-1]), negs.permute(1, 0)).flatten())
+
 
         l_neg = torch.stack(l_neg)  # [N, 2*(N-1)]
         l_neg /= temperature
@@ -124,7 +133,12 @@ for e in range(40):
 
         #############
         #############
-        # l_negs = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives.view(1, (2*batch_size), out_dim))
+        # if use_cosine_similarity:
+        #     l_negs = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives.view(1, (2*batch_size), out_dim))
+        # else:
+        #     l_negs = torch.tensordot(zis.view(batch_size, 1, out_dim), negatives.T.view(1, out_dim, (2 * batch_size)),
+        #                              dims=2)
+        #
         # l_negs = l_negs[negative_mask].view(l_negs.shape[0], -1)
         # l_negs /= temperature
         #############
