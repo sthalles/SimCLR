@@ -12,7 +12,7 @@ class GaussianBlur(object):
     def __call__(self, sample):
         sample = np.array(sample)
 
-        # blue the image with a 50% chance
+        # blur the image with a 50% chance
         prob = np.random.random_sample()
 
         if prob < 0.5:
