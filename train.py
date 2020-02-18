@@ -120,6 +120,7 @@ for e in range(40):
         #############
         # l_negs = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives.view(1, 6, out_dim))
         #
+        # This mask can only be created once
         # mask = torch.ones_like(l_negs, dtype=bool)
         # for i in range(l_negs.shape[0]):
         #     mask[i, i] = 0
