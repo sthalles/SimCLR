@@ -45,7 +45,7 @@ optimizer = optim.Adam(model.parameters(), 3e-4)
 train_writer = SummaryWriter()
 
 similarity = torch.nn.CosineSimilarity(dim=1)
-similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
+# similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
 
 n_iter = 0
 for e in range(40):
@@ -83,6 +83,7 @@ for e in range(40):
         train_writer.add_histogram("xj_latent", zjs, global_step=n_iter)
         # print(hjs.shape, zjs.shape)
 
+        # normalize projection feature vectors
         zis = F.normalize(zis, dim=1)
         zjs = F.normalize(zjs, dim=1)
 
