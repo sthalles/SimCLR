@@ -1,14 +1,17 @@
 import numpy as np
 import torch
+
+print(torch.__version__)
 import torch.optim as optim
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from torchvision import datasets
+from torch.utils.tensorboard import SummaryWriter
 
 from model import Encoder
 from utils import GaussianBlur
 
-batch_size = 32
+batch_size = 64
 out_dim = 64
 s = 1
 
@@ -22,13 +25,13 @@ data_augment = transforms.Compose([transforms.ToPILImage(),
                                    GaussianBlur(),
                                    transforms.ToTensor()])
 
-train_dataset = datasets.STL10('data', download=True, transform=transforms.ToTensor())
+train_dataset = datasets.STL10('data', split='train+unlabeled', download=True, transform=transforms.ToTensor())
 train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, drop_last=True, shuffle=True)
 
 model = Encoder(out_dim=out_dim)
 print(model)
 
-train_gpu = False  ## torch.cuda.is_available()
+train_gpu = torch.cuda.is_available()
 print("Is gpu available:", train_gpu)
 # moves the model paramemeters to gpu
 if train_gpu:
@@ -37,7 +40,10 @@ if train_gpu:
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), 3e-4)
 
-for e in range(20):
+train_writer = SummaryWriter()
+
+n_iter = 0
+for e in range(40):
     for step, (batch_x, _) in enumerate(train_loader):
         # print("Input batch:", batch_x.shape, torch.min(batch_x), torch.max(batch_x))
         optimizer.zero_grad()
@@ -57,12 +63,19 @@ for e in range(20):
 
         xis = torch.stack(xis)
         xjs = torch.stack(xjs)
+        if train_gpu:
+            xis = xis.cuda()
+            xjs = xjs.cuda()
         # print("Transformed input stats:", torch.min(xis), torch.max(xjs))
 
-        _, zis = model(xis)  # [N,C]
+        ris, zis = model(xis)  # [N,C]
+        train_writer.add_histogram("xi_repr", ris, global_step=n_iter)
+        train_writer.add_histogram("xi_latent", zis, global_step=n_iter)
         # print(his.shape, zis.shape)
 
-        _, zjs = model(xjs)  # [N,C]
+        rjs, zjs = model(xjs)  # [N,C]
+        train_writer.add_histogram("xj_repr", rjs, global_step=n_iter)
+        train_writer.add_histogram("xj_latent", zjs, global_step=n_iter)
         # print(hjs.shape, zjs.shape)
 
         # positive pairs
@@ -89,9 +102,11 @@ for e in range(20):
             labels = labels.cuda()
 
         loss = criterion(logits, labels)
+        train_writer.add_scalar('loss', loss, global_step=n_iter)
 
         loss.backward()
         optimizer.step()
-        print("Step {}, Loss {}".format(step, loss))
+        n_iter += 1
+        # print("Step {}, Loss {}".format(step, loss))
 
 torch.save(model.state_dict(), './model/checkpoint.pth')
