@@ -86,6 +86,8 @@ for e in range(40):
         # normalize projection feature vectors
         zis = F.normalize(zis, dim=1)
         zjs = F.normalize(zjs, dim=1)
+        assert zis.shape == (batch_size, out_dim), "Shape not expected."
+        assert zis.shape == (batch_size, out_dim), "Shape not expected."
 
         # positive pairs
         # l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
