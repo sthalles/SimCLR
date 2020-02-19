@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from yaml import load
 
 print(torch.__version__)
 import torch.optim as optim
@@ -9,14 +10,16 @@ from torchvision import datasets
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
-from model import Encoder
+from model import Encoder, ResNet18
 from utils import GaussianBlur
 
-batch_size = 3
-out_dim = 4
-s = 1
-temperature = 0.5
-use_cosine_similarity = True
+config = load(open("config.ymal", "r"))
+
+batch_size = config['batch_size']
+out_dim = config['out_dim']
+s = config['s']
+temperature = config['temperature']
+use_cosine_similarity = config['use_cosine_similarity']
 
 color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
 
@@ -28,10 +31,11 @@ data_augment = transforms.Compose([transforms.ToPILImage(),
                                    GaussianBlur(),
                                    transforms.ToTensor()])
 
-train_dataset = datasets.STL10('data', split='train', download=True, transform=transforms.ToTensor())
+train_dataset = datasets.STL10('data', split='train+unlabeled', download=True, transform=transforms.ToTensor())
 train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, drop_last=True, shuffle=True)
 
-model = Encoder(out_dim=out_dim)
+# model = Encoder(out_dim=out_dim)
+model = ResNet18()
 print(model)
 
 train_gpu = torch.cuda.is_available()
@@ -49,15 +53,14 @@ if use_cosine_similarity:
     similarity_dim1 = torch.nn.CosineSimilarity(dim=1)
     similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
 
-# # This mask can only be created once
-# # Mask to remove positive examples from the batch of negative samples
-# negative_mask = torch.ones((batch_size, 2*batch_size), dtype=bool)
-# for i in range(batch_size):
-#     negative_mask[i, i] = 0
-#     negative_mask[i, i + batch_size] = 0
+# Mask to remove positive examples from the batch of negative samples
+negative_mask = torch.ones((batch_size, 2 * batch_size), dtype=bool)
+for i in range(batch_size):
+    negative_mask[i, i] = 0
+    negative_mask[i, i + batch_size] = 0
 
 n_iter = 0
-for e in range(40):
+for e in range(config['epochs']):
     for step, (batch_x, _) in enumerate(train_loader):
         # print("Input batch:", batch_x.shape, torch.min(batch_x), torch.max(batch_x))
         optimizer.zero_grad()
@@ -68,34 +71,26 @@ for e in range(40):
             xis.append(data_augment(batch_x[k]))
             xjs.append(data_augment(batch_x[k]))
 
-        # fig, axs = plt.subplots(nrows=3, ncols=2, constrained_layout=False)
-        # for i_ in range(3):
-        #     axs[i_, 0].imshow(xis[i_].permute(1, 2, 0))
-        #     axs[i_, 1].imshow(xjs[i_].permute(1, 2, 0))
-        # plt.show()
-
         xis = torch.stack(xis)
         xjs = torch.stack(xjs)
+
         if train_gpu:
             xis = xis.cuda()
             xjs = xjs.cuda()
-        # print("Transformed input stats:", torch.min(xis), torch.max(xjs))
 
         ris, zis = model(xis)  # [N,C]
         train_writer.add_histogram("xi_repr", ris, global_step=n_iter)
         train_writer.add_histogram("xi_latent", zis, global_step=n_iter)
-        # print(his.shape, zis.shape)
 
         rjs, zjs = model(xjs)  # [N,C]
         train_writer.add_histogram("xj_repr", rjs, global_step=n_iter)
         train_writer.add_histogram("xj_latent", zjs, global_step=n_iter)
-        # print(hjs.shape, zjs.shape)
 
         # normalize projection feature vectors
         zis = F.normalize(zis, dim=1)
         zjs = F.normalize(zjs, dim=1)
-        assert zis.shape == (batch_size, out_dim), "Shape not expected: " + str(zis.shape)
-        assert zjs.shape == (batch_size, out_dim), "Shape not expected: " + str(zjs.shape)
+        # assert zis.shape == (batch_size, out_dim), "Shape not expected: " + str(zis.shape)
+        # assert zjs.shape == (batch_size, out_dim), "Shape not expected: " + str(zjs.shape)
 
         # positive pairs
         if use_cosine_similarity:
@@ -104,49 +99,22 @@ for e in range(40):
             l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
 
         l_pos /= temperature
+        # assert l_pos.shape == (batch_size, 1)  # [N,1]
 
-        assert l_pos.shape == (batch_size, 1)  # [N,1]
-        l_neg = []
+        negatives = torch.cat([zjs, zis], dim=0)
 
-        #############
-        #############
-        # negatives = torch.cat([zjs, zis], dim=0)
-        #############
-        #############
+        if use_cosine_similarity:
+            l_neg = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives.view(1, (2 * batch_size), out_dim))
+        else:
+            l_neg = torch.tensordot(zis.view(batch_size, 1, out_dim), negatives.T.view(1, out_dim, (2 * batch_size)),
+                                    dims=2)
 
-        for i in range(zis.shape[0]):
-            mask = np.ones(zjs.shape[0], dtype=bool)
-            mask[i] = False
-            negs = torch.cat([zjs[mask], zis[mask]], dim=0)  # [2*(N-1), C]
-
-            if use_cosine_similarity:
-                l_neg.append(similarity_dim1(zis[i].view(1, zis.shape[-1]), negs).flatten())
-            else:
-                l_neg.append(torch.mm(zis[i].view(1, zis.shape[-1]), negs.permute(1, 0)).flatten())
-
-
-        l_neg = torch.stack(l_neg)  # [N, 2*(N-1)]
+        l_neg = l_neg[negative_mask].view(l_neg.shape[0], -1)
         l_neg /= temperature
 
-        assert l_neg.shape == (batch_size, 2 * (batch_size - 1)), "Shape of negatives not expected." + str(l_neg.shape)
-        # print("l_neg.shape -->", l_neg.shape)
-
-        #############
-        #############
-        # if use_cosine_similarity:
-        #     l_negs = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives.view(1, (2*batch_size), out_dim))
-        # else:
-        #     l_negs = torch.tensordot(zis.view(batch_size, 1, out_dim), negatives.T.view(1, out_dim, (2 * batch_size)),
-        #                              dims=2)
-        #
-        # l_negs = l_negs[negative_mask].view(l_negs.shape[0], -1)
-        # l_negs /= temperature
-        #############
-        #############
+        # assert l_neg.shape == (batch_size, 2 * (batch_size - 1)), "Shape of negatives not expected." + str(l_neg.shape)
 
         logits = torch.cat([l_pos, l_neg], dim=1)  # [N,K+1]
-        # print("logits.shape -->",logits.shape)
-
         labels = torch.zeros(batch_size, dtype=torch.long)
 
         if train_gpu:

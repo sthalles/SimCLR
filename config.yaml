@@ -1,0 +1,6 @@
+batch_size: 256
+out_dim: 64
+s: 1
+temperature: 0.5
+use_cosine_similarity: True
+epochs: 20
