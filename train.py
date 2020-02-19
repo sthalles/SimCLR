@@ -62,7 +62,7 @@ for i in range(batch_size):
 n_iter = 0
 for e in range(config['epochs']):
     for step, (batch_x, _) in enumerate(train_loader):
-        # print("Input batch:", batch_x.shape, torch.min(batch_x), torch.max(batch_x))
+
         optimizer.zero_grad()
 
         xis = []
@@ -104,7 +104,8 @@ for e in range(config['epochs']):
         negatives = torch.cat([zjs, zis], dim=0)
 
         if use_cosine_similarity:
-            l_neg = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives.view(1, (2 * batch_size), out_dim))
+            negatives = negatives.view(1, (2 * batch_size), out_dim)
+            l_neg_1 = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives)
         else:
             l_neg = torch.tensordot(zis.view(batch_size, 1, out_dim), negatives.T.view(1, out_dim, (2 * batch_size)),
                                     dims=2)
