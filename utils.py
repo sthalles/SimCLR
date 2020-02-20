@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 
+np.random.seed(0)
+
 
 class GaussianBlur(object):
 
@@ -20,3 +22,12 @@ class GaussianBlur(object):
             sample = cv2.GaussianBlur(sample, (self.kernel_size, self.kernel_size), sigma)
 
         return sample
+
+# if use_cosine_similarity:
+#     cos1d = torch.nn.CosineSimilarity(dim=1)
+#     cos2d = torch.nn.CosineSimilarity(dim=2)
+#     similarity_dim1 = lambda x, y: cos1d(x, y.unsqueeze(0))
+#     similarity_dim2 = lambda x, y: cos2d(x, y.unsqueeze(0))
+# else:
+#     similarity_dim1 = lambda x, y: torch.bmm(x.unsqueeze(1), y.unsqueeze(2))
+#     similarity_dim2 = lambda x, y: torch.tensordot(x, y.T.unsqueeze(0), dims=2)

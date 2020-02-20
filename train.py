@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 import yaml
 
@@ -10,8 +9,10 @@ from torchvision import datasets
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
-from model import Encoder, ResNet18
+from model import Encoder
 from utils import GaussianBlur
+
+torch.manual_seed(0)
 
 config = yaml.load(open("config.yaml", "r"), Loader=yaml.FullLoader)
 
@@ -31,11 +32,11 @@ data_augment = transforms.Compose([transforms.ToPILImage(),
                                    GaussianBlur(),
                                    transforms.ToTensor()])
 
-train_dataset = datasets.STL10('data', split='train+unlabeled', download=True, transform=transforms.ToTensor())
+train_dataset = datasets.STL10('data', split='train', download=True, transform=transforms.ToTensor())
 train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, drop_last=True, shuffle=True)
 
-# model = Encoder(out_dim=out_dim)
-model = ResNet18()
+model = Encoder(out_dim=out_dim)
+# model = ResNet18(out_dim=out_dim)
 print(model)
 
 train_gpu = torch.cuda.is_available()
@@ -99,30 +100,31 @@ for e in range(config['epochs']):
             l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
 
         l_pos /= temperature
-        # assert l_pos.shape == (batch_size, 1)  # [N,1]
+        assert l_pos.shape == (batch_size, 1)  # [N,1]
 
         negatives = torch.cat([zjs, zis], dim=0)
 
-        if use_cosine_similarity:
-            negatives = negatives.view(1, (2 * batch_size), out_dim)
-            l_neg_1 = similarity_dim2(zis.view(batch_size, 1, out_dim), negatives)
-            l_neg_2 = similarity_dim2(zjs.view(batch_size, 1, out_dim), negatives)
-        else:
-            l_neg_1 = torch.tensordot(zis.view(batch_size, 1, out_dim), negatives.T.view(1, out_dim, (2 * batch_size)),
-                                      dims=2)
-            l_neg_2 = torch.tensordot(zjs.view(batch_size, 1, out_dim), negatives.T.view(1, out_dim, (2 * batch_size)),
-                                      dims=2)
-
-        labels = torch.zeros(batch_size, dtype=torch.long)
-        if train_gpu:
-            labels = labels.cuda()
-
         loss = 0
-        for l_neg in [l_neg_1, l_neg_2]:
+
+        for positives in [zis, zjs]:
+
+            if use_cosine_similarity:
+                negatives = negatives.view(1, (2 * batch_size), out_dim)
+                l_neg = similarity_dim2(positives.view(batch_size, 1, out_dim), negatives)
+            else:
+                l_neg = torch.tensordot(positives.view(batch_size, 1, out_dim),
+                                        negatives.T.view(1, out_dim, (2 * batch_size)),
+                                        dims=2)
+
+            labels = torch.zeros(batch_size, dtype=torch.long)
+            if train_gpu:
+                labels = labels.cuda()
+
             l_neg = l_neg[negative_mask].view(l_neg.shape[0], -1)
             l_neg /= temperature
 
-            # assert l_neg.shape == (batch_size, 2 * (batch_size - 1)), "Shape of negatives not expected." + str(l_neg.shape)
+            assert l_neg.shape == (batch_size, 2 * (batch_size - 1)), "Shape of negatives not expected." + str(
+                l_neg.shape)
             logits = torch.cat([l_pos, l_neg], dim=1)  # [N,K+1]
             loss += criterion(logits, labels)
 
