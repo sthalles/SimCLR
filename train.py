@@ -9,7 +9,7 @@ from torchvision import datasets
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
-from model import ResNet18
+from model import ResNetSimCLR
 from utils import GaussianBlur
 
 torch.manual_seed(0)
@@ -36,7 +36,7 @@ train_dataset = datasets.STL10('data', split='train', download=True, transform=t
 train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, drop_last=True, shuffle=True)
 
 # model = Encoder(out_dim=out_dim)
-model = ResNet18(out_dim=out_dim)
+model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
 print(model)
 
 train_gpu = torch.cuda.is_available()
