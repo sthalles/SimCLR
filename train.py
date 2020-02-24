@@ -33,8 +33,9 @@ data_augment = transforms.Compose([transforms.ToPILImage(),
                                    GaussianBlur(),
                                    transforms.ToTensor()])
 
-train_dataset = datasets.STL10('data', split='train', download=True, transform=transforms.ToTensor())
-train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1, drop_last=True, shuffle=True)
+train_dataset = datasets.STL10('./data', split='train', download=True, transform=transforms.ToTensor())
+train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=config['num_workers'], drop_last=True,
+                          shuffle=True)
 
 # model = Encoder(out_dim=out_dim)
 model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
