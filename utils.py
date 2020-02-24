@@ -1,7 +1,16 @@
 import cv2
 import numpy as np
+import torch
 
 np.random.seed(0)
+
+
+def get_negative_mask(batch_size):
+    negative_mask = torch.ones((batch_size, 2 * batch_size), dtype=bool)
+    for i in range(batch_size):
+        negative_mask[i, i] = 0
+        negative_mask[i, i + batch_size] = 0
+    return negative_mask
 
 
 class GaussianBlur(object):

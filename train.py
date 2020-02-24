@@ -9,8 +9,9 @@ from torchvision import datasets
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
-from model import ResNetSimCLR
-from utils import GaussianBlur
+from models.baseline_encoder import Encoder
+from models.resnet_simclr import ResNetSimCLR
+from utils import GaussianBlur, get_negative_mask
 
 torch.manual_seed(0)
 
@@ -52,14 +53,11 @@ optimizer = optim.Adam(model.parameters(), 3e-4)
 train_writer = SummaryWriter()
 
 if use_cosine_similarity:
-    similarity_dim1 = torch.nn.CosineSimilarity(dim=1)
-    similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
+    cos_similarity_dim1 = torch.nn.CosineSimilarity(dim=1)
+    cos_similarity_dim2 = torch.nn.CosineSimilarity(dim=2)
 
 # Mask to remove positive examples from the batch of negative samples
-negative_mask = torch.ones((batch_size, 2 * batch_size), dtype=bool)
-for i in range(batch_size):
-    negative_mask[i, i] = 0
-    negative_mask[i, i + batch_size] = 0
+negative_mask = get_negative_mask(batch_size)
 
 n_iter = 0
 for e in range(config['epochs']):
@@ -96,7 +94,8 @@ for e in range(config['epochs']):
 
         # positive pairs
         if use_cosine_similarity:
-            l_pos = similarity_dim1(zis.view(batch_size, out_dim), zjs.view(batch_size, out_dim)).view(batch_size, 1)
+            l_pos = cos_similarity_dim1(zis.view(batch_size, out_dim), zjs.view(batch_size, out_dim)).view(batch_size,
+                                                                                                           1)
         else:
             l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
 
@@ -111,7 +110,7 @@ for e in range(config['epochs']):
 
             if use_cosine_similarity:
                 negatives = negatives.view(1, (2 * batch_size), out_dim)
-                l_neg = similarity_dim2(positives.view(batch_size, 1, out_dim), negatives)
+                l_neg = cos_similarity_dim2(positives.view(batch_size, 1, out_dim), negatives)
             else:
                 l_neg = torch.tensordot(positives.view(batch_size, 1, out_dim),
                                         negatives.T.view(1, out_dim, (2 * batch_size)),
@@ -137,4 +136,4 @@ for e in range(config['epochs']):
         n_iter += 1
         # print("Step {}, Loss {}".format(step, loss))
 
-torch.save(model.state_dict(), './model/checkpoint.pth')
+torch.save(model.state_dict(), './checkpoints/checkpoint.pth')
