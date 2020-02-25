@@ -16,3 +16,7 @@ use_cosine_similarity: True # Distance metric for contrastive loss. If False, us
 epochs: 40 # Number of epochs to train
 num_workers: 4 # Number of workers for the data loader
 ```
+
+## Feature Evaluation
+
+For a simple assessment of SimCLR using STL-10 and ResNet-18, check the ```feature_eval/FeatureEvaluation.ipynb``` notebook.
