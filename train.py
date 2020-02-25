@@ -9,9 +9,8 @@ from torchvision import datasets
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
-from models.baseline_encoder import Encoder
 from models.resnet_simclr import ResNetSimCLR
-from utils import GaussianBlur, get_negative_mask
+from utils import get_negative_mask, get_augmentation_transform
 
 torch.manual_seed(0)
 
@@ -19,19 +18,10 @@ config = yaml.load(open("config.yaml", "r"), Loader=yaml.FullLoader)
 
 batch_size = config['batch_size']
 out_dim = config['out_dim']
-s = config['s']
 temperature = config['temperature']
 use_cosine_similarity = config['use_cosine_similarity']
 
-color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
-
-data_augment = transforms.Compose([transforms.ToPILImage(),
-                                   transforms.RandomResizedCrop(96),
-                                   transforms.RandomHorizontalFlip(),
-                                   transforms.RandomApply([color_jitter], p=0.8),
-                                   transforms.RandomGrayscale(p=0.2),
-                                   GaussianBlur(),
-                                   transforms.ToTensor()])
+data_augment = get_augmentation_transform(s=config['s'])
 
 train_dataset = datasets.STL10('./data', split='train', download=True, transform=transforms.ToTensor())
 train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=config['num_workers'], drop_last=True,
@@ -39,7 +29,6 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=conf
 
 # model = Encoder(out_dim=out_dim)
 model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
-print(model)
 
 train_gpu = torch.cuda.is_available()
 print("Is gpu available:", train_gpu)
@@ -68,9 +57,11 @@ for e in range(config['epochs']):
 
         xis = []
         xjs = []
+
+        # draw two augmentation functions t , t' and apply separately for each input example
         for k in range(len(batch_x)):
-            xis.append(data_augment(batch_x[k]))
-            xjs.append(data_augment(batch_x[k]))
+            xis.append(data_augment(batch_x[k]))  # the first augmentation
+            xjs.append(data_augment(batch_x[k]))  # the second augmentation
 
         xis = torch.stack(xis)
         xjs = torch.stack(xjs)
@@ -79,10 +70,12 @@ for e in range(config['epochs']):
             xis = xis.cuda()
             xjs = xjs.cuda()
 
+        # get the representations and the projections
         ris, zis = model(xis)  # [N,C]
         train_writer.add_histogram("xi_repr", ris, global_step=n_iter)
         train_writer.add_histogram("xi_latent", zis, global_step=n_iter)
 
+        # get the representations and the projections
         rjs, zjs = model(xjs)  # [N,C]
         train_writer.add_histogram("xj_repr", rjs, global_step=n_iter)
         train_writer.add_histogram("xj_latent", zjs, global_step=n_iter)
@@ -101,7 +94,7 @@ for e in range(config['epochs']):
             l_pos = torch.bmm(zis.view(batch_size, 1, out_dim), zjs.view(batch_size, out_dim, 1)).view(batch_size, 1)
 
         l_pos /= temperature
-        # assert l_pos.shape == (batch_size, 1)  # [N,1]
+        # assert l_pos.shape == (batch_size, 1), "l_pos shape not valid" + str(l_pos.shape)  # [N,1]
 
         negatives = torch.cat([zjs, zis], dim=0)
 
