@@ -6,7 +6,7 @@ Check out the Blog post with full documentation: [Exploring SimCLR: A Simple Fra
 
 Before runing SimCLR, make sure you choose the correct running configurations on the ```config.yaml``` file.
 
-```
+```yaml
 batch_size: 256 # A batch size of N, produces 2 * (N-1) negative samples. Original implementation uses a batch size of 8192
 out_dim: 64 # Output dimensionality of the embedding vector z. Original implementation uses 2048
 s: 1
