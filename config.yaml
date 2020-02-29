@@ -3,6 +3,6 @@ out_dim: 64
 s: 1
 temperature: 0.5
 base_convnet: "resnet18" # one of: "resnet18 or resnet50"
-use_cosine_similarity: True
+use_cosine_similarity: False
 epochs: 40
-num_workers: 4
+num_workers: 0
