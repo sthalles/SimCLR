@@ -34,7 +34,7 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=conf
 # model = Encoder(out_dim=out_dim)
 model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
 
-train_gpu = torch.cuda.is_available()
+train_gpu = False  # torch.cuda.is_available()
 print("Is gpu available:", train_gpu)
 
 # moves the model parameters to gpu
@@ -54,6 +54,8 @@ negative_mask = get_negative_mask(batch_size)
 n_iter = 0
 for e in range(config['epochs']):
     for step, ((xis, xjs), _) in enumerate(train_loader):
+
+        optimizer.zero_grad()
 
         if train_gpu:
             xis = xis.cuda()

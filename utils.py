@@ -1,8 +1,5 @@
-import cv2
 import numpy as np
 import torch
-import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
 
 np.random.seed(0)
 cos1d = torch.nn.CosineSimilarity(dim=1)
