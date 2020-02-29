@@ -21,7 +21,7 @@ out_dim = config['out_dim']
 temperature = config['temperature']
 use_cosine_similarity = config['use_cosine_similarity']
 
-data_augment = get_augmentation_transform(s=config['s'])
+data_augment = get_augmentation_transform(s=config['s'], crop_size=96)
 
 train_dataset = datasets.STL10('./data', split='train', download=True, transform=transforms.ToTensor())
 train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=config['num_workers'], drop_last=True,
@@ -30,10 +30,10 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=conf
 # model = Encoder(out_dim=out_dim)
 model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
 
-train_gpu = torch.cuda.is_available()
+train_gpu = False  # torch.cuda.is_available()
 print("Is gpu available:", train_gpu)
 
-# moves the model paramemeters to gpu
+# moves the model parameters to gpu
 if train_gpu:
     model.cuda()
 
@@ -103,12 +103,11 @@ for e in range(config['epochs']):
         for positives in [zis, zjs]:
 
             if use_cosine_similarity:
-                negatives = negatives.view(1, (2 * batch_size), out_dim)
-                l_neg = cos_similarity_dim2(positives.view(batch_size, 1, out_dim), negatives)
+                l_neg = cos_similarity_dim2(positives.view(batch_size, 1, out_dim),
+                                            negatives.view(1, (2 * batch_size), out_dim))
             else:
                 l_neg = torch.tensordot(positives.view(batch_size, 1, out_dim),
-                                        negatives.T.view(1, out_dim, (2 * batch_size)),
-                                        dims=2)
+                                        negatives.T.view(1, out_dim, (2 * batch_size)), dims=2)
 
             labels = torch.zeros(batch_size, dtype=torch.long)
             if train_gpu:

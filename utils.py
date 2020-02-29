@@ -4,6 +4,8 @@ import torch
 import torchvision.transforms as transforms
 
 np.random.seed(0)
+cos1d = torch.nn.CosineSimilarity(dim=1)
+cos2d = torch.nn.CosineSimilarity(dim=2)
 
 
 def get_negative_mask(batch_size):
@@ -37,11 +39,11 @@ class GaussianBlur(object):
         return sample
 
 
-def get_augmentation_transform(s=1):
+def get_augmentation_transform(s, crop_size):
     # get a set of data augmentation transformations as described in the SimCLR paper.
     color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
     data_aug_ope = transforms.Compose([transforms.ToPILImage(),
-                                       transforms.RandomResizedCrop(96),
+                                       transforms.RandomResizedCrop(crop_size),
                                        transforms.RandomHorizontalFlip(),
                                        transforms.RandomApply([color_jitter], p=0.8),
                                        transforms.RandomGrayscale(p=0.2),
@@ -49,11 +51,29 @@ def get_augmentation_transform(s=1):
                                        transforms.ToTensor()])
     return data_aug_ope
 
-# if use_cosine_similarity:
-#     cos1d = torch.nn.CosineSimilarity(dim=1)
-#     cos2d = torch.nn.CosineSimilarity(dim=2)
-#     similarity_dim1 = lambda x, y: cos1d(x, y.unsqueeze(0))
-#     similarity_dim2 = lambda x, y: cos2d(x, y.unsqueeze(0))
-# else:
-#     similarity_dim1 = lambda x, y: torch.bmm(x.unsqueeze(1), y.unsqueeze(2))
-#     similarity_dim2 = lambda x, y: torch.tensordot(x, y.T.unsqueeze(0), dims=2)
+
+def _dot_simililarity_dim1(x, y):
+    v = torch.bmm(x.unsqueeze(1), y.unsqueeze(2))
+    return v
+
+
+def _dot_simililarity_dim2(x, y):
+    v = torch.tensordot(x.unsqueeze(1), y.T.unsqueeze(0), dims=2)
+    return v
+
+
+def _cosine_simililarity_dim1(x, y):
+    v = cos1d(x, y)
+    return v
+
+
+def _cosine_simililarity_dim2(x, y):
+    v = cos2d(x.unsqueeze(1), y.unsqueeze(0))
+    return v
+
+
+def get_similarity_function(use_cosine_similarity):
+    if use_cosine_similarity:
+        return _cosine_simililarity_dim1, _cosine_simililarity_dim2
+    else:
+        return _dot_simililarity_dim1, _dot_simililarity_dim2
