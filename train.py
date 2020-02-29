@@ -8,9 +8,10 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
-
+import matplotlib.pyplot as plt
 from models.resnet_simclr import ResNetSimCLR
-from utils import get_negative_mask, get_augmentation_transform, get_similarity_function
+from utils import get_negative_mask, get_similarity_function
+from data_aug.data_transform import DataTransform, get_data_transform_opes
 
 torch.manual_seed(0)
 
@@ -21,9 +22,9 @@ out_dim = config['out_dim']
 temperature = config['temperature']
 use_cosine_similarity = config['use_cosine_similarity']
 
-data_augment = get_augmentation_transform(s=config['s'], crop_size=96)
+data_augment = get_data_transform_opes(s=config['s'], crop_size=96)
 
-train_dataset = datasets.STL10('./data', split='train+unlabeled', download=True, transform=transforms.ToTensor())
+train_dataset = datasets.STL10('./data', split='train', download=True, transform=DataTransform(data_augment))
 # train_dataset = datasets.Caltech101(root='./data', target_type="category", transform=transforms.ToTensor(),
 #                                     target_transform=None, download=True)
 
@@ -52,20 +53,7 @@ negative_mask = get_negative_mask(batch_size)
 
 n_iter = 0
 for e in range(config['epochs']):
-    for step, (batch_x, _) in enumerate(train_loader):
-
-        optimizer.zero_grad()
-
-        xis = []
-        xjs = []
-
-        # draw two augmentation functions t , t' and apply separately for each input example
-        for k in range(len(batch_x)):
-            xis.append(data_augment(batch_x[k]))  # the first augmentation
-            xjs.append(data_augment(batch_x[k]))  # the second augmentation
-
-        xis = torch.stack(xis)
-        xjs = torch.stack(xjs)
+    for step, ((xis, xjs), _) in enumerate(train_loader):
 
         if train_gpu:
             xis = xis.cuda()
