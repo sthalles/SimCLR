@@ -24,7 +24,7 @@ use_cosine_similarity = config['use_cosine_similarity']
 
 data_augment = get_data_transform_opes(s=config['s'], crop_size=96)
 
-train_dataset = datasets.STL10('./data', split='train', download=True, transform=DataTransform(data_augment))
+train_dataset = datasets.STL10('./data', split='train+unlabeled', download=True, transform=DataTransform(data_augment))
 # train_dataset = datasets.Caltech101(root='./data', target_type="category", transform=transforms.ToTensor(),
 #                                     target_transform=None, download=True)
 
@@ -34,7 +34,7 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=conf
 # model = Encoder(out_dim=out_dim)
 model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
 
-train_gpu = False  # torch.cuda.is_available()
+train_gpu = torch.cuda.is_available()
 print("Is gpu available:", train_gpu)
 
 # moves the model parameters to gpu
@@ -54,6 +54,11 @@ negative_mask = get_negative_mask(batch_size)
 n_iter = 0
 for e in range(config['epochs']):
     for step, ((xis, xjs), _) in enumerate(train_loader):
+
+        # fig, axs = plt.subplots(nrows=1, ncols=2, constrained_layout=False)
+        # axs[0].imshow(xis[2].numpy().transpose((1,2,0)))
+        # axs[1].imshow(xjs[2].numpy().transpose((1,2,0)))
+        # plt.show()
 
         optimizer.zero_grad()
 
