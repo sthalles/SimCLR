@@ -55,11 +55,6 @@ n_iter = 0
 for e in range(config['epochs']):
     for step, ((xis, xjs), _) in enumerate(train_loader):
 
-        # fig, axs = plt.subplots(nrows=1, ncols=2, constrained_layout=False)
-        # axs[0].imshow(xis[2].numpy().transpose((1,2,0)))
-        # axs[1].imshow(xjs[2].numpy().transpose((1,2,0)))
-        # plt.show()
-
         optimizer.zero_grad()
 
         if train_gpu:
