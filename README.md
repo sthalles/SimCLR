@@ -1,5 +1,7 @@
 # PyTorch implementation of SimCLR: A Simple Framework for Contrastive Learning of Visual Representations
 
+![Image of SimCLR Arch](https://sthalles.github.io/assets/contrastive-self-supervised/cover.png)
+
 Check out the Blog post with full documentation: [Exploring SimCLR: A Simple Framework for Contrastive Learning of Visual Representations](https://sthalles.github.io/simple-self-supervised-learning/)
 
 ## Config file
@@ -22,12 +24,9 @@ num_workers: 4 # Number of workers for the data loader
 Feature evaluation is done using a linear model protocol. Feature are learnt using the ```STL10 unsupervised``` set and evaluated in the train/test splits;
 
 Check the ```feature_eval/FeatureEvaluation.ipynb``` notebook for reproducebility.
-
-| Feature Extractor     | Architecture | Top 1 |
-|-----------------------|--------------|-------|
-|  Using PCA Features   |              |       |
-| Logistic Regression   |       -      | 36.0% |
-| KNN                   |       -      | 31.8  |
-| Using SimCLR Features |              |       |
-| Logistic Regression   |   ResNet-18  | 71.8% |
-| KNN                   | ResNet-18    | 66.7% |
+|  Feature Extractor  |    Method    | Architecture | Top 1 |
+|:-------------------:|:------------:|:------------:|:-----:|
+| Logistic Regression | PCA Features |       -      | 36.0% |
+|         KNN         | PCA Features |       -      |  31.8 |
+| Logistic Regression |    SimCLR    |   ResNet-18  | 71.8% |
+|         KNN         |    SimCLR    |   ResNet-18  | 66.7% |
