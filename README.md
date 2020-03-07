@@ -1,8 +1,13 @@
 # PyTorch implementation of SimCLR: A Simple Framework for Contrastive Learning of Visual Representations
 
+### Blog post with full documentation: [Exploring SimCLR: A Simple Framework for Contrastive Learning of Visual Representations](https://sthalles.github.io/simple-self-supervised-learning/)
+
 ![Image of SimCLR Arch](https://sthalles.github.io/assets/contrastive-self-supervised/cover.png)
 
-Check out the Blog post with full documentation: [Exploring SimCLR: A Simple Framework for Contrastive Learning of Visual Representations](https://sthalles.github.io/simple-self-supervised-learning/)
+## Dependencies
+
+- pytorch
+- opencv
 
 ## Config file
 
@@ -30,3 +35,7 @@ Check the ```feature_eval/FeatureEvaluation.ipynb``` notebook for reproducebilit
 |         KNN         | PCA Features |       -      |  31.8 |
 | Logistic Regression |    SimCLR    |   ResNet-18  | 71.8% |
 |         KNN         |    SimCLR    |   ResNet-18  | 66.7% |
+
+## Download pre-trained model 
+
+- [ResNet-18](https://drive.google.com/open?id=1zDHvk1oE1k3b4ApsK1AdMREIAcpkG-We) Trained using ```STl10 unsupervised``` set.
