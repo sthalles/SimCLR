@@ -19,4 +19,15 @@ num_workers: 4 # Number of workers for the data loader
 
 ## Feature Evaluation
 
-For a simple assessment of SimCLR using STL-10 and ResNet-18, check the ```feature_eval/FeatureEvaluation.ipynb``` notebook.
+Feature evaluation is done using a linear model protocol. Feature are learnt using the ```STL10 unsupervised``` set and evaluated in the train/test splits;
+
+Check the ```feature_eval/FeatureEvaluation.ipynb``` notebook for reproducebility.
+
+| Feature Extractor     | Architecture | Top 1 |
+|-----------------------|--------------|-------|
+|  Using PCA Features   |              |       |
+| Logistic Regression   |       -      | 36.0% |
+| KNN                   |       -      | 31.8  |
+| Using SimCLR Features |              |       |
+| Logistic Regression   |   ResNet-18  | 71.8% |
+| KNN                   | ResNet-18    | 66.7% |
