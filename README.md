@@ -11,7 +11,7 @@
 
 ## Config file
 
-Before runing SimCLR, make sure you choose the correct running configurations on the ```config.yaml``` file.
+Before running SimCLR, make sure you choose the correct running configurations on the ```config.yaml``` file.
 
 ```yaml
 batch_size: 256 # A batch size of N, produces 2 * (N-1) negative samples. Original implementation uses a batch size of 8192
@@ -26,7 +26,7 @@ num_workers: 4 # Number of workers for the data loader
 
 ## Feature Evaluation
 
-Feature evaluation is done using a linear model protocol. Feature are learnt using the ```STL10 unsupervised``` set and evaluated in the train/test splits;
+Feature evaluation is done using a linear model protocol. Feature are learned using the ```STL10 unsupervised``` set and evaluated in the train/test splits;
 
 Check the ```feature_eval/FeatureEvaluation.ipynb``` notebook for reproducebility.
 |  Feature Extractor  |    Method    | Architecture | Top 1 |
