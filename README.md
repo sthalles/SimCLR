@@ -4,6 +4,8 @@
 
 ![Image of SimCLR Arch](https://sthalles.github.io/assets/contrastive-self-supervised/cover.png)
 
+For a Tensorflow 2.0 Implementation: [Tensorflow SimCLR](https://github.com/sthalles/SimCLR-tensorflow)
+
 ## Dependencies
 
 - pytorch
