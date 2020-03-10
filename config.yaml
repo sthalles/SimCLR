@@ -6,5 +6,5 @@ base_convnet: "resnet18" # one of: "resnet18 or resnet50"
 use_cosine_similarity: True
 epochs: 50
 num_workers: 4
-valid_size: 0.04
+valid_size: 0.05
 eval_every_n_epochs: 2

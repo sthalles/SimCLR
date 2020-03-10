@@ -25,7 +25,7 @@ use_cosine_similarity = config['use_cosine_similarity']
 
 data_augment = get_data_transform_opes(s=config['s'], crop_size=96)
 
-train_dataset = datasets.STL10('./data', split='unlabeled', download=True, transform=DataTransform(data_augment))
+train_dataset = datasets.STL10('./data', split='train+unlabeled', download=True, transform=DataTransform(data_augment))
 
 train_loader, valid_loader = get_train_validation_data_loaders(train_dataset, config)
 
@@ -121,6 +121,7 @@ for epoch_counter in range(config['epochs']):
                 if train_gpu:
                     xis = xis.cuda()
                     xjs = xjs.cuda()
+
                 loss = step(xis, xjs)
 
                 if loss < best_valid_loss:
