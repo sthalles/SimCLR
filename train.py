@@ -71,7 +71,6 @@ def step(xis, xjs):
     negatives = torch.cat([zjs, zis], dim=0)
 
     loss = 0
-
     for positives in [zis, zjs]:
         l_neg = sim_func_dim2(positives, negatives)
 
