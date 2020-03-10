@@ -4,8 +4,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 np.random.seed(0)
-cos1d = torch.nn.CosineSimilarity(dim=1)
-cos2d = torch.nn.CosineSimilarity(dim=2)
+cosine_similarity = torch.nn.CosineSimilarity(dim=-1)
 
 
 def get_train_validation_data_loaders(train_dataset, config):
@@ -25,7 +24,7 @@ def get_train_validation_data_loaders(train_dataset, config):
 
     valid_loader = DataLoader(train_dataset, batch_size=config['batch_size'], sampler=valid_sampler,
                               num_workers=config['num_workers'],
-                              drop_last=False)
+                              drop_last=True)
     return train_loader, valid_loader
 
 
@@ -57,7 +56,7 @@ def _dot_simililarity_dim2(x, y):
 
 
 def _cosine_simililarity_dim1(x, y):
-    v = cos1d(x, y)
+    v = cosine_similarity(x, y)
     return v
 
 
@@ -65,7 +64,7 @@ def _cosine_simililarity_dim2(x, y):
     # x shape: (N, 1, C)
     # y shape: (1, 2N, C)
     # v shape: (N, 2N)
-    v = cos2d(x.unsqueeze(1), y.unsqueeze(0))
+    v = cosine_similarity(x.unsqueeze(1), y.unsqueeze(0))
     return v
 
 

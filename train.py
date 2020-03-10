@@ -93,6 +93,7 @@ if not os.path.exists(model_checkpoints_folder):
     os.makedirs(model_checkpoints_folder)
 
 n_iter = 0
+valid_n_iter = 0
 best_valid_loss = np.inf
 
 for epoch_counter in range(config['epochs']):
@@ -115,18 +116,24 @@ for epoch_counter in range(config['epochs']):
         # validation steps
         with torch.no_grad():
             model.eval()
-            for (xis, xjs), _ in valid_loader:
+
+            valid_loss = 0.0
+            for counter, ((xis, xjs), _) in enumerate(valid_loader):
 
                 if train_gpu:
                     xis = xis.cuda()
                     xjs = xjs.cuda()
+                loss = (step(xis, xjs))
+                valid_loss += loss.item()
 
-                loss = step(xis, xjs)
+            valid_loss /= counter
 
-                if loss < best_valid_loss:
-                    # save the model weights
-                    best_valid_loss = loss
-                    torch.save(model.state_dict(), os.path.join(model_checkpoints_folder, 'model.pth'))
-                train_writer.add_scalar('validation_loss', loss, global_step=epoch_counter)
+            if valid_loss < best_valid_loss:
+                # save the model weights
+                best_valid_loss = valid_loss
+                torch.save(model.state_dict(), os.path.join(model_checkpoints_folder, 'model.pth'))
+
+            train_writer.add_scalar('validation_loss', valid_loss, global_step=valid_n_iter)
+            valid_n_iter += 1
 
         model.train()
