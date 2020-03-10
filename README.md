@@ -31,7 +31,7 @@ num_workers: 4 # Number of workers for the data loader
 
 Feature evaluation is done using a linear model protocol. Feature are learned using the ```STL10 unsupervised``` set and evaluated in the train/test splits;
 
-Check the ```feature_eval/FeatureEvaluation.ipynb``` notebook for reproducebility.
+Check the ```feature_eval/linear_feature_eval.ipynb``` notebook for reproducebility.
 |  Feature Extractor  |    Method    | Architecture | Top 1 |
 |:-------------------:|:------------:|:------------:|:-----:|
 | Logistic Regression | PCA Features |       -      | 36.0% |
