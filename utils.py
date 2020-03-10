@@ -1,9 +1,32 @@
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
 
 np.random.seed(0)
 cos1d = torch.nn.CosineSimilarity(dim=1)
 cos2d = torch.nn.CosineSimilarity(dim=2)
+
+
+def get_train_validation_data_loaders(train_dataset, config):
+    # obtain training indices that will be used for validation
+    num_train = len(train_dataset)
+    indices = list(range(num_train))
+    np.random.shuffle(indices)
+    split = int(np.floor(config['valid_size'] * num_train))
+    train_idx, valid_idx = indices[split:], indices[:split]
+
+    # define samplers for obtaining training and validation batches
+    train_sampler = SubsetRandomSampler(train_idx)
+    valid_sampler = SubsetRandomSampler(valid_idx)
+
+    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], sampler=train_sampler,
+                              num_workers=config['num_workers'], drop_last=True, shuffle=False)
+
+    valid_loader = DataLoader(train_dataset, batch_size=config['batch_size'], sampler=valid_sampler,
+                              num_workers=config['num_workers'],
+                              drop_last=False)
+    return train_loader, valid_loader
 
 
 def get_negative_mask(batch_size):
