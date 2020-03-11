@@ -35,7 +35,7 @@ Check the ```feature_eval/linear_feature_eval.ipynb``` notebook for reproducebil
 |  Feature Extractor  |    Method    | Architecture | Top 1 |
 |:-------------------:|:------------:|:------------:|:-----:|
 | Logistic Regression | PCA Features |       -      | 36.0% |
-|         KNN         | PCA Features |       -      |  31.8 |
+|         KNN         | PCA Features |       -      | 31.8% |
 | Logistic Regression |    SimCLR    |   ResNet-18  | 71.8% |
 |         KNN         |    SimCLR    |   ResNet-18  | 66.7% |
 
