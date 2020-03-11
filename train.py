@@ -1,5 +1,6 @@
 import torch
 import yaml
+import shutil
 
 print(torch.__version__)
 import torch.optim as optim
@@ -31,6 +32,11 @@ train_loader, valid_loader = get_train_validation_data_loaders(train_dataset, co
 
 # model = Encoder(out_dim=out_dim)
 model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
+
+model_id = 'Mar10_19-20-40_thallessilva'
+checkpoints_folder = os.path.join('./runs', model_id, 'checkpoints')
+state_dict = torch.load(os.path.join(checkpoints_folder, 'model.pth'))
+model.load_state_dict(state_dict)
 
 train_gpu = torch.cuda.is_available()
 print("Is gpu available:", train_gpu)
@@ -91,6 +97,7 @@ def step(xis, xjs):
 model_checkpoints_folder = os.path.join(train_writer.log_dir, 'checkpoints')
 if not os.path.exists(model_checkpoints_folder):
     os.makedirs(model_checkpoints_folder)
+    shutil.copy('./config.yaml', os.path.join(model_checkpoints_folder, 'config.yaml'))
 
 n_iter = 0
 valid_n_iter = 0
