@@ -25,6 +25,8 @@ base_convnet: "resnet18" # The ConvNet base model. Choose one of: "resnet18 or r
 use_cosine_similarity: True # Distance metric for contrastive loss. If False, uses dot product
 epochs: 40 # Number of epochs to train
 num_workers: 4 # Number of workers for the data loader
+valid_size: 0.05 # validation set size
+eval_every_n_epochs: 2 # frequency to eval the feature representations' quality 
 ```
 
 ## Feature Evaluation
@@ -36,8 +38,8 @@ Check the ```feature_eval/linear_feature_eval.ipynb``` notebook for reproducebil
 |:-------------------:|:------------:|:------------:|:-----:|
 | Logistic Regression | PCA Features |       -      | 36.0% |
 |         KNN         | PCA Features |       -      | 31.8% |
-| Logistic Regression |    SimCLR    |   ResNet-18  | 71.8% |
-|         KNN         |    SimCLR    |   ResNet-18  | 66.7% |
+| Logistic Regression |    SimCLR    |   ResNet-18  | 75.0% |
+|         KNN         |    SimCLR    |   ResNet-18  | 70.0% |
 
 ## Download pre-trained model 
 
