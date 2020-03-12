@@ -1,6 +1,7 @@
+import shutil
+
 import torch
 import yaml
-import shutil
 
 print(torch.__version__)
 import torch.optim as optim
@@ -11,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 import numpy as np
 from models.resnet_simclr import ResNetSimCLR
-from utils import get_negative_mask, get_similarity_function, get_train_validation_data_loaders
+from utils import get_similarity_function, get_train_validation_data_loaders
 from data_aug.data_transform import DataTransform, get_data_transform_opes
 
 torch.manual_seed(0)
@@ -26,17 +27,18 @@ use_cosine_similarity = config['use_cosine_similarity']
 
 data_augment = get_data_transform_opes(s=config['s'], crop_size=96)
 
-train_dataset = datasets.STL10('./data', split='train+unlabeled', download=True, transform=DataTransform(data_augment))
+train_dataset = datasets.STL10('./data', split='train', download=True, transform=DataTransform(data_augment))
 
 train_loader, valid_loader = get_train_validation_data_loaders(train_dataset, config)
 
 # model = Encoder(out_dim=out_dim)
 model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
 
-model_id = 'Mar10_19-20-40_thallessilva'
-checkpoints_folder = os.path.join('./runs', model_id, 'checkpoints')
-state_dict = torch.load(os.path.join(checkpoints_folder, 'model.pth'))
-model.load_state_dict(state_dict)
+if eval(config['continue_training']):
+    model_id = eval(config['continue_training'])
+    checkpoints_folder = os.path.join('./runs', model_id, 'checkpoints')
+    state_dict = torch.load(os.path.join(checkpoints_folder, 'model.pth'))
+    model.load_state_dict(state_dict)
 
 train_gpu = torch.cuda.is_available()
 print("Is gpu available:", train_gpu)
@@ -52,8 +54,14 @@ train_writer = SummaryWriter()
 
 sim_func_dim1, sim_func_dim2 = get_similarity_function(use_cosine_similarity)
 
-# Mask to remove positive examples from the batch of negative samples
-negative_mask = get_negative_mask(batch_size)
+megative_mask = (1 - torch.eye(2 * batch_size)).type(torch.bool)
+labels = (np.eye((2 * batch_size), 2 * batch_size - 1, k=-batch_size) + np.eye((2 * batch_size), 2 * batch_size - 1,
+                                                                               k=batch_size - 1)).astype(np.int)
+labels = torch.from_numpy(labels)
+softmax = torch.nn.Softmax(dim=-1)
+
+if train_gpu:
+    labels.cuda()
 
 
 def step(xis, xjs):
@@ -71,26 +79,17 @@ def step(xis, xjs):
     zis = F.normalize(zis, dim=1)
     zjs = F.normalize(zjs, dim=1)
 
-    l_pos = sim_func_dim1(zis, zjs).view(batch_size, 1)
-    l_pos /= temperature
-
     negatives = torch.cat([zjs, zis], dim=0)
 
-    loss = 0
-    for positives in [zis, zjs]:
-        l_neg = sim_func_dim2(positives, negatives)
+    logits = sim_func_dim2(negatives, negatives)
+    logits = logits[megative_mask.type(torch.bool)].view(2 * batch_size, -1)
+    logits /= temperature
+    assert logits.shape == (2 * batch_size, 2 * batch_size - 1), "Shape of negatives not expected." + str(
+        logits.shape)
 
-        labels = torch.zeros(batch_size, dtype=torch.long)
-        if train_gpu:
-            labels = labels.cuda()
+    probs = softmax(logits)
+    loss = torch.mean(-torch.sum(labels * torch.log(probs), dim=-1))
 
-        l_neg = l_neg[negative_mask].view(l_neg.shape[0], -1)
-        l_neg /= temperature
-
-        logits = torch.cat([l_pos, l_neg], dim=1)  # [N,K+1]
-        loss += criterion(logits, labels)
-
-    loss = loss / (2 * batch_size)
     return loss
 
 
