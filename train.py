@@ -52,7 +52,7 @@ optimizer = optim.Adam(model.parameters(), 3e-4)
 
 train_writer = SummaryWriter()
 
-sim_func_dim1, sim_func_dim2 = get_similarity_function(use_cosine_similarity)
+_, similarity_func = get_similarity_function(use_cosine_similarity)
 
 megative_mask = (1 - torch.eye(2 * batch_size)).type(torch.bool)
 labels = (np.eye((2 * batch_size), 2 * batch_size - 1, k=-batch_size) + np.eye((2 * batch_size), 2 * batch_size - 1,
@@ -81,11 +81,11 @@ def step(xis, xjs):
 
     negatives = torch.cat([zjs, zis], dim=0)
 
-    logits = sim_func_dim2(negatives, negatives)
+    logits = similarity_func(negatives, negatives)
     logits = logits[megative_mask.type(torch.bool)].view(2 * batch_size, -1)
     logits /= temperature
-    assert logits.shape == (2 * batch_size, 2 * batch_size - 1), "Shape of negatives not expected." + str(
-        logits.shape)
+    # assert logits.shape == (2 * batch_size, 2 * batch_size - 1), "Shape of negatives not expected." + str(
+    #     logits.shape)
 
     probs = softmax(logits)
     loss = torch.mean(-torch.sum(labels * torch.log(probs), dim=-1))
