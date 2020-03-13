@@ -27,13 +27,19 @@ epochs: 40 # Number of epochs to train
 num_workers: 4 # Number of workers for the data loader
 valid_size: 0.05 # validation set size
 eval_every_n_epochs: 2 # frequency to eval the similary score using the validation set
+continue_training: Mar10_21-50-05_thallessilva # defines a folder containing a pre-trained model to fine-tune
+log_every_n_steps: 50 # frequency to which tensorboard is updated
+input_shape: (96,96,3) # dataset input shape. For datasets containing images of different size, this defines the final cropped shape
 ```
 
 ## Feature Evaluation
 
-Feature evaluation is done using a linear model protocol. Feature are learned using the ```STL10 unsupervised``` set and evaluated in the train/test splits;
+Feature evaluation is done using a linear model protocol. 
+
+Features are learned using the ```STL10 train+unsupervised``` set and evaluated in the ```test``` set;
 
 Check the ```feature_eval/linear_feature_eval.ipynb``` notebook for reproducebility.
+
 |  Feature Extractor  |    Method    | Architecture | Top 1 |
 |:-------------------:|:------------:|:------------:|:-----:|
 | Logistic Regression | PCA Features |       -      | 36.0% |
