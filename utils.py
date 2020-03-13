@@ -7,24 +7,24 @@ np.random.seed(0)
 cosine_similarity = torch.nn.CosineSimilarity(dim=-1)
 
 
-def get_train_validation_data_loaders(train_dataset, config):
+def get_train_validation_data_loaders(train_dataset, batch_size, num_workers, valid_size, **ignored):
     # obtain training indices that will be used for validation
     num_train = len(train_dataset)
     indices = list(range(num_train))
     np.random.shuffle(indices)
-    split = int(np.floor(config['valid_size'] * num_train))
+
+    split = int(np.floor(valid_size * num_train))
     train_idx, valid_idx = indices[split:], indices[:split]
 
     # define samplers for obtaining training and validation batches
     train_sampler = SubsetRandomSampler(train_idx)
     valid_sampler = SubsetRandomSampler(valid_idx)
 
-    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], sampler=train_sampler,
-                              num_workers=config['num_workers'], drop_last=True, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=train_sampler,
+                              num_workers=num_workers, drop_last=True, shuffle=False)
 
-    valid_loader = DataLoader(train_dataset, batch_size=config['batch_size'], sampler=valid_sampler,
-                              num_workers=config['num_workers'],
-                              drop_last=True)
+    valid_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=valid_sampler,
+                              num_workers=num_workers, drop_last=True)
     return train_loader, valid_loader
 
 
@@ -39,24 +39,11 @@ def get_negative_mask(batch_size):
     return negative_mask
 
 
-def _dot_simililarity_dim1(x, y):
-    # x shape: (N, 1, C)
-    # y shape: (N, C, 1)
-    # v shape: (N, 1, 1)
-    v = torch.bmm(x.unsqueeze(1), y.unsqueeze(2))  #
-    return v
-
-
 def _dot_simililarity_dim2(x, y):
     v = torch.tensordot(x.unsqueeze(1), y.T.unsqueeze(0), dims=2)
     # x shape: (N, 1, C)
     # y shape: (1, C, 2N)
     # v shape: (N, 2N)
-    return v
-
-
-def _cosine_simililarity_dim1(x, y):
-    v = cosine_similarity(x, y)
     return v
 
 
@@ -70,6 +57,6 @@ def _cosine_simililarity_dim2(x, y):
 
 def get_similarity_function(use_cosine_similarity):
     if use_cosine_similarity:
-        return _cosine_simililarity_dim1, _cosine_simililarity_dim2
+        return _cosine_simililarity_dim2
     else:
-        return _dot_simililarity_dim1, _dot_simililarity_dim2
+        return _dot_simililarity_dim2

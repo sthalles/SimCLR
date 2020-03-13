@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import numpy as np
 from models.resnet_simclr import ResNetSimCLR
 from utils import get_similarity_function, get_train_validation_data_loaders
-from data_aug.data_transform import DataTransform, get_data_transform_opes
+from data_aug.data_transform import DataTransform, get_simclr_data_transform
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -25,34 +25,34 @@ out_dim = config['out_dim']
 temperature = config['temperature']
 use_cosine_similarity = config['use_cosine_similarity']
 
-data_augment = get_data_transform_opes(s=config['s'], crop_size=96)
+data_augment = get_simclr_data_transform(s=config['s'], crop_size=96)
 
 train_dataset = datasets.STL10('./data', split='train+unlabeled', download=True, transform=DataTransform(data_augment))
 
-train_loader, valid_loader = get_train_validation_data_loaders(train_dataset, config)
+train_loader, valid_loader = get_train_validation_data_loaders(train_dataset, **config)
 
 # model = Encoder(out_dim=out_dim)
 model = ResNetSimCLR(base_model=config["base_convnet"], out_dim=out_dim)
 
-if eval(config['continue_training']):
-    model_id = eval(config['continue_training'])
-    checkpoints_folder = os.path.join('./runs', model_id, 'checkpoints')
+if config['continue_training']:
+    checkpoints_folder = os.path.join('./runs', config['continue_training'], 'checkpoints')
     state_dict = torch.load(os.path.join(checkpoints_folder, 'model.pth'))
     model.load_state_dict(state_dict)
+    print("Loaded pre-trained model with success.")
 
 train_gpu = torch.cuda.is_available()
 print("Is gpu available:", train_gpu)
 
 # moves the model parameters to gpu
 if train_gpu:
-    model.cuda()
+    model = model.cuda()
 
 criterion = torch.nn.CrossEntropyLoss(reduction='sum')
 optimizer = optim.Adam(model.parameters(), 3e-4)
 
 train_writer = SummaryWriter()
 
-_, similarity_func = get_similarity_function(use_cosine_similarity)
+similarity_func = get_similarity_function(use_cosine_similarity)
 
 megative_mask = (1 - torch.eye(2 * batch_size)).type(torch.bool)
 labels = (np.eye((2 * batch_size), 2 * batch_size - 1, k=-batch_size) + np.eye((2 * batch_size), 2 * batch_size - 1,
@@ -61,19 +61,21 @@ labels = torch.from_numpy(labels)
 softmax = torch.nn.Softmax(dim=-1)
 
 if train_gpu:
-    labels.cuda()
+    labels = labels.cuda()
 
 
 def step(xis, xjs):
     # get the representations and the projections
     ris, zis = model(xis)  # [N,C]
-    train_writer.add_histogram("xi_repr", ris, global_step=n_iter)
-    train_writer.add_histogram("xi_latent", zis, global_step=n_iter)
 
     # get the representations and the projections
     rjs, zjs = model(xjs)  # [N,C]
-    train_writer.add_histogram("xj_repr", rjs, global_step=n_iter)
-    train_writer.add_histogram("xj_latent", zjs, global_step=n_iter)
+
+    if n_iter % config['log_every_n_steps'] == 0:
+        train_writer.add_histogram("xi_repr", ris, global_step=n_iter)
+        train_writer.add_histogram("xi_latent", zis, global_step=n_iter)
+        train_writer.add_histogram("xj_repr", rjs, global_step=n_iter)
+        train_writer.add_histogram("xj_latent", zjs, global_step=n_iter)
 
     # normalize projection feature vectors
     zis = F.normalize(zis, dim=1)

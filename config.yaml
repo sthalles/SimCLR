@@ -8,4 +8,5 @@ epochs: 50
 num_workers: 0
 valid_size: 0.05
 eval_every_n_epochs: 2
-continue_training: None
+continue_training: Mar10_21-50-05_thallessilva
+log_every_n_steps: 50

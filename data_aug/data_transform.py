@@ -34,7 +34,7 @@ class GaussianBlur(object):
         return sample
 
 
-def get_data_transform_opes(s, crop_size):
+def get_simclr_data_transform(s, crop_size):
     # get a set of data augmentation transformations as described in the SimCLR paper.
     color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
     data_transforms = transforms.Compose([transforms.RandomResizedCrop(size=crop_size),
