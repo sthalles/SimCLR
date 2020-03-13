@@ -26,7 +26,7 @@ use_cosine_similarity: True # Distance metric for contrastive loss. If False, us
 epochs: 40 # Number of epochs to train
 num_workers: 4 # Number of workers for the data loader
 valid_size: 0.05 # validation set size
-eval_every_n_epochs: 2 # frequency to eval the feature representations' quality 
+eval_every_n_epochs: 2 # frequency to eval the similary score using the validation set
 ```
 
 ## Feature Evaluation
