@@ -27,7 +27,7 @@ batch_size: 512
 # Number of epochs to train
 epochs: 40
 
-# Frequency to eval the similary score using the validation set
+# Frequency to eval the similarity score using the validation set
 eval_every_n_epochs: 1
 
 # Specify a folder containing a pre-trained model to fine-tune
@@ -72,15 +72,17 @@ Feature evaluation is done using a linear model protocol.
 
 Features are learned using the ```STL10 train+unsupervised``` set and evaluated in the ```test``` set;
 
-Check the ```feature_eval/linear_feature_eval.ipynb``` notebook for reproducebility.
+Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sthalles/SimCLR/blob/9d071bb3dd93e921217c415cf0924aad2d0b13eb/feature_eval/linear_feature_eval.ipynb) notebook for reproducibility.
 
-|  Feature Extractor  |    Method    | Architecture | Top 1 |
-|:-------------------:|:------------:|:------------:|:-----:|
-| Logistic Regression | PCA Features |       -      | 36.0% |
-|         KNN         | PCA Features |       -      | 31.8% |
-| Logistic Regression |    SimCLR    |   ResNet-18  | 75.0% |
-|         KNN         |    SimCLR    |   ResNet-18  | 70.0% |
 
-## Download pre-trained model 
+|      Linear Classifier      | Feature Extractor | Architecture | Feature dimensionality | Projection Head  dimensionality | Epochs | STL10 Top 1 |
+|:---------------------------:|:-----------------:|:------------:|:----------------------:|:-------------------------------:|:------:|:-----------:|
+|     Logistic Regression     |    PCA Features   |       -      |           256          |                -                |        |    36.0%    |
+|             KNN             |    PCA Features   |       -      |           256          |                -                |        |    31.8%    |
+| Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/file/d/12kKgvo4h41G9qnDdhDnZXFlR5_aqvaVR/view?usp=sharing)  |           512          |               256               |   40   |    70.3%    |
+|             KNN             |       SimCLR      |   ResNet-18  |           512          |               256               |   40   |    66.2%    |
+| Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/open?id=1LjuZ1RmhotrnugprRQc2Exk0EbQHMJhL)  |           512          |               256               |   80   |    72.9%    |
+|             KNN             |       SimCLR      |   ResNet-18  |           512          |               256               |   80   |    69.8%    |
+| Logistic Regression (LBFGS) |       SimCLR      |   ResNet-50  |          2048          |                -                |   40   |      -      |
 
-- [ResNet-18](https://drive.google.com/open?id=1zDHvk1oE1k3b4ApsK1AdMREIAcpkG-We) Trained using ```STl10 unsupervised``` set.
+
