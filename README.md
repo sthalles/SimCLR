@@ -72,7 +72,7 @@ Feature evaluation is done using a linear model protocol.
 
 Features are learned using the ```STL10 train+unsupervised``` set and evaluated in the ```test``` set;
 
-Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sthalles/SimCLR/blob/9d071bb3dd93e921217c415cf0924aad2d0b13eb/feature_eval/linear_feature_eval.ipynb) notebook for reproducibility.
+Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/sthalles/SimCLR/blob/master/feature_eval/linear_feature_eval.ipynb) notebook for reproducibility.
 
 
 |      Linear Classifier      | Feature Extractor | Architecture | Feature dimensionality | Projection Head  dimensionality | Epochs | STL10 Top 1 |
