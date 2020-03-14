@@ -1,7 +1,7 @@
-batch_size: 1
-epochs: 33
+batch_size: 512
+epochs: 40
 eval_every_n_epochs: 1
-fine_tune_from: 'Mar13_20-12-09_thallessilva'
+fine_tune_from: 'Mar13_22-46-30_thallessilva'
 log_every_n_steps: 50
 
 model:

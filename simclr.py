@@ -5,26 +5,34 @@ import torch.nn.functional as F
 from loss.nt_xent import NTXentLoss
 import os
 import shutil
-from data_aug.dataset_wrapper import DataSetWrapper
 import numpy as np
+import torchvision
 
 torch.manual_seed(0)
 
 
+def _save_config_file(model_checkpoints_folder):
+    if not os.path.exists(model_checkpoints_folder):
+        os.makedirs(model_checkpoints_folder)
+        shutil.copy('./config.yaml', os.path.join(model_checkpoints_folder, 'config.yaml'))
+
+
 class SimCLR(object):
 
-    def __init__(self, config):
+    def __init__(self, dataset, config):
         self.config = config
         self.device = self._get_device()
         self.writer = SummaryWriter()
+        self.dataset = dataset
         self.nt_xent_criterion = NTXentLoss(self.device, config['batch_size'], **config['loss'])
 
     def _get_device(self):
-        device = 'cuda' if torch.cuda.is_available() else 'gpu'
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print("Running on:", device)
         return device
 
     def _step(self, model, xis, xjs, n_iter):
+
         # get the representations and the projections
         ris, zis = model(xis)  # [N,C]
 
@@ -47,8 +55,8 @@ class SimCLR(object):
         return loss
 
     def train(self):
-        dataset = DataSetWrapper(self.config['batch_size'], **self.config['dataset'])
-        train_loader, valid_loader = dataset.get_data_loaders()
+
+        train_loader, valid_loader = self.dataset.get_data_loaders()
 
         model = ResNetSimCLR(**self.config["model"]).to(self.device)
         model = self._load_pre_trained_weights(model)
@@ -58,7 +66,7 @@ class SimCLR(object):
         model_checkpoints_folder = os.path.join(self.writer.log_dir, 'checkpoints')
 
         # save config file
-        self._save_config_file(model_checkpoints_folder)
+        _save_config_file(model_checkpoints_folder)
 
         n_iter = 0
         valid_n_iter = 0
@@ -102,11 +110,6 @@ class SimCLR(object):
                     valid_n_iter += 1
 
                 model.train()
-
-    def _save_config_file(self, model_checkpoints_folder):
-        if not os.path.exists(model_checkpoints_folder):
-            os.makedirs(model_checkpoints_folder)
-            shutil.copy('./config.yaml', os.path.join(model_checkpoints_folder, 'config.yaml'))
 
     def _load_pre_trained_weights(self, model):
         try:

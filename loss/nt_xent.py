@@ -22,19 +22,16 @@ class NTXentLoss(torch.nn.Module):
             return self._dot_simililarity
 
     def _get_labels(self):
-        labels = (np.eye((2 * self.batch_size), 2 * self.batch_size - 1, k=-self.batch_size) + np.eye(
-            (2 * self.batch_size),
-            2 * self.batch_size - 1,
-            k=self.batch_size - 1)).astype(np.int)
-        labels = torch.from_numpy(labels)
-        labels = labels.to(self.device)
-        return labels
+        l1 = np.eye((2 * self.batch_size), 2 * self.batch_size - 1, k=-self.batch_size)
+        l2 = np.eye((2 * self.batch_size), 2 * self.batch_size - 1, k=self.batch_size - 1)
+        labels = torch.from_numpy((l1 + l2).astype(np.int))
+        return labels.to(self.device)
 
     def _get_correlated_mask(self):
-        mask_samples_from_same_repr = (1 - torch.eye(2 * self.batch_size)).type(torch.bool)
-        return mask_samples_from_same_repr
+        return (1 - torch.eye(2 * self.batch_size)).type(torch.bool)
 
-    def _dot_simililarity(self, x, y):
+    @staticmethod
+    def _dot_simililarity(x, y):
         v = torch.tensordot(x.unsqueeze(1), y.T.unsqueeze(0), dims=2)
         # x shape: (N, 1, C)
         # y shape: (1, C, 2N)
