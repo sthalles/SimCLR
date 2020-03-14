@@ -54,8 +54,8 @@ class NTXentLoss(torch.nn.Module):
         logits = self.similarity_function(negatives, negatives)
         logits = logits[self.mask_samples_from_same_repr.type(torch.bool)].view(2 * self.batch_size, -1)
         logits /= self.temperature
-        assert logits.shape == (2 * self.batch_size, 2 * self.batch_size - 1), "Shape of negatives not expected." + str(
-            logits.shape)
+        # assert logits.shape == (2 * self.batch_size, 2 * self.batch_size - 1), "Shape of negatives not expected." + str(
+        #     logits.shape)
 
         probs = self.softmax(logits)
         loss = torch.mean(-torch.sum(self.labels * torch.log(probs), dim=-1))

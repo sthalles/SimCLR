@@ -1,4 +1,4 @@
-batch_size: 512
+batch_size: 1
 epochs: 33
 eval_every_n_epochs: 1
 fine_tune_from: 'Mar13_20-12-09_thallessilva'
