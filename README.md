@@ -27,7 +27,7 @@ batch_size: 512
 # Number of epochs to train
 epochs: 40
 
-# Frequency to eval the similary score using the validation set
+# Frequency to eval the similarity score using the validation set
 eval_every_n_epochs: 1
 
 # Specify a folder containing a pre-trained model to fine-tune
