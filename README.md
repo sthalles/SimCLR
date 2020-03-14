@@ -17,19 +17,53 @@
 Before running SimCLR, make sure you choose the correct running configurations on the ```config.yaml``` file.
 
 ```yaml
-batch_size: 256 # A batch size of N, produces 2 * (N-1) negative samples. Original implementation uses a batch size of 8192
-out_dim: 64 # Output dimensionality of the embedding vector z. Original implementation uses 2048
-s: 1
-temperature: 0.5 # Temperature parameter for the contrastive objective
-base_convnet: "resnet18" # The ConvNet base model. Choose one of: "resnet18 or resnet50". Original implementation uses resnet50
-use_cosine_similarity: True # Distance metric for contrastive loss. If False, uses dot product
-epochs: 40 # Number of epochs to train
-num_workers: 4 # Number of workers for the data loader
-valid_size: 0.05 # validation set size
-eval_every_n_epochs: 2 # frequency to eval the similary score using the validation set
-continue_training: Mar10_21-50-05_thallessilva # defines a folder containing a pre-trained model to fine-tune
-log_every_n_steps: 50 # frequency to which tensorboard is updated
-input_shape: (96,96,3) # dataset input shape. For datasets containing images of different size, this defines the final cropped shape
+
+# A batch size of N, produces 2 * (N-1) negative samples. Original implementation uses a batch size of 8192
+batch_size: 512 
+
+# Number of epochs to train
+epochs: 40
+
+# Frequency to eval the similary score using the validation set
+eval_every_n_epochs: 1
+
+# Specify a folder containing a pre-trained model to fine-tune
+fine_tune_from: 'Mar13_20-12-09_thallessilva'
+
+# Frequency to which tensorboard is updated
+log_every_n_steps: 50
+
+# Model related parameters
+model:
+  # Output dimensionality of the embedding vector z. Original implementation uses 2048
+  out_dim: 256 
+  
+  # The ConvNet base model. Choose one of: "resnet18" or "resnet50". Original implementation uses resnet50
+  base_model: "resnet18"
+
+# Dataset related parameters
+dataset:
+  s: 1
+  
+  # dataset input shape. For datasets containing images of different size, this defines the final 
+  input_shape: (96,96,3) 
+  
+  # Number of workers for the data loader
+  num_workers: 0
+  
+  # Size of the validation set in percentage
+  valid_size: 0.05
+
+# NTXent loss related parameters
+loss:
+  # Temperature parameter for the contrastive objective
+  temperature: 0.5 
+  
+  # Distance metric for contrastive loss. If False, uses dot product. Original implementation uses cosine similarity.
+  use_cosine_similarity: True
+
+
+
 ```
 
 ## Feature Evaluation
