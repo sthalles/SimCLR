@@ -1,12 +1,12 @@
-batch_size: 512
+batch_size: 256
 epochs: 40
 eval_every_n_epochs: 1
-fine_tune_from: 'Mar13_22-46-30_thallessilva'
+fine_tune_from: None
 log_every_n_steps: 50
 
 model:
-  out_dim: 256
-  base_model: "resnet18"
+  out_dim: 128
+  base_model: "resnet50"
 
 dataset:
   s: 1
