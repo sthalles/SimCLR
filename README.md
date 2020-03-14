@@ -7,7 +7,7 @@
 ![Image of SimCLR Arch](https://sthalles.github.io/assets/contrastive-self-supervised/cover.png)
 
 
-## Instalation
+## Installation
 
 ```
 $ conda create --name simclr python=3.7 --file requirements.txt
