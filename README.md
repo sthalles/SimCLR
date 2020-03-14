@@ -61,9 +61,6 @@ loss:
   
   # Distance metric for contrastive loss. If False, uses dot product. Original implementation uses cosine similarity.
   use_cosine_similarity: True
-
-
-
 ```
 
 ## Feature Evaluation
