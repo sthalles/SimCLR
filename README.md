@@ -74,12 +74,15 @@ Features are learned using the ```STL10 train+unsupervised``` set and evaluated 
 
 Check the ```feature_eval/linear_feature_eval.ipynb``` notebook for reproducebility.
 
-|  Feature Extractor  |    Method    | Architecture | Top 1 |
-|:-------------------:|:------------:|:------------:|:-----:|
-| Logistic Regression | PCA Features |       -      | 36.0% |
-|         KNN         | PCA Features |       -      | 31.8% |
-| Logistic Regression |    SimCLR    |   ResNet-18  | 75.0% |
-|         KNN         |    SimCLR    |   ResNet-18  | 70.0% |
+|  Linear Classifier  | Feature Extractor | Architecture | Feature dimension | Project Head  dimension | Trained for (# epochs) | STL10 Top 1 |
+|:-------------------:|:-----------------:|:------------:|:-----------------:|:-----------------------:|:----------------------:|:-----------:|
+| Logistic Regression |    PCA Features   |       -      |        256        |            -            |                        |    36.0%    |
+|         KNN         |    PCA Features   |       -      |        256        |            -            |                        |    31.8%    |
+| Logistic Regression |       SimCLR      |   ResNet-18  |        512        |           256           |           40           |    70.3%    |
+|         KNN         |       SimCLR      |   ResNet-18  |        512        |           256           |           40           |    66.2%    |
+| Logistic Regression |       SimCLR      |   ResNet-18  |        512        |           256           |           80           |             |
+|         KNN         |       SimCLR      |   ResNet-18  |        512        |           256           |           80           |      -      |
+| Logistic Regression |       SimCLR      |   ResNet-50  |        2048       |            -            |           40           |      -      |
 
 ## Download pre-trained model 
 
