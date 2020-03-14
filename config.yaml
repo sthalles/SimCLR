@@ -1,12 +1,19 @@
 batch_size: 512
-out_dim: 256
-s: 1
-temperature: 0.5
-base_convnet: "resnet18" # one of: "resnet18 or resnet50"
-use_cosine_similarity: True
-epochs: 50
-num_workers: 0
-valid_size: 0.05
-eval_every_n_epochs: 2
-continue_training: Mar10_21-50-05_thallessilva
+epochs: 33
+eval_every_n_epochs: 1
+fine_tune_from: 'Mar13_20-12-09_thallessilva'
 log_every_n_steps: 50
+
+model:
+  out_dim: 256
+  base_model: "resnet18"
+
+dataset:
+  s: 1
+  input_shape: (96,96,3)
+  num_workers: 0
+  valid_size: 0.05
+
+loss:
+  temperature: 0.5
+  use_cosine_similarity: True
