@@ -78,12 +78,9 @@ Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge
 |:-------------------:|:-----------------:|:------------:|:-----------------:|:-----------------------:|:----------------------:|:-----------:|
 | Logistic Regression |    PCA Features   |       -      |        256        |            -            |                        |    36.0%    |
 |         KNN         |    PCA Features   |       -      |        256        |            -            |                        |    31.8%    |
-| Logistic Regression |       SimCLR      |   ResNet-18  |        512        |           256           |           40           |    70.3%    |
+| Logistic Regression |       SimCLR      |   [ResNet-18](https://drive.google.com/file/d/12kKgvo4h41G9qnDdhDnZXFlR5_aqvaVR/view?usp=sharing)  |        512        |           256           |           40           |    70.3%    |
 |         KNN         |       SimCLR      |   ResNet-18  |        512        |           256           |           40           |    66.2%    |
 | Logistic Regression |       SimCLR      |   ResNet-18  |        512        |           256           |           80           |             |
 |         KNN         |       SimCLR      |   ResNet-18  |        512        |           256           |           80           |      -      |
 | Logistic Regression |       SimCLR      |   ResNet-50  |        2048       |            -            |           40           |      -      |
 
-## Download pre-trained model 
-
-- [ResNet-18](https://drive.google.com/open?id=1zDHvk1oE1k3b4ApsK1AdMREIAcpkG-We) Trained using ```STl10 unsupervised``` set.
