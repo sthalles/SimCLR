@@ -83,7 +83,7 @@ Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge
 |             KNN             |       SimCLR      |   ResNet-18  |           512          |               256               |   40   |    66.2%    |
 | Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/open?id=1L0yoeY9i2mzDcj69P4slTWb-cfr3PyoT)  |           512          |               256               |   80   |    72.9%    |
 |             KNN             |       SimCLR      |   ResNet-18  |           512          |               256               |   80   |    69.8%    |
-|  Logistic Regression (Adam) |       SimCLR      |   [ResNet-50](https://drive.google.com/open?id=1TZqBNTFCsO-mxAiR-zJeyupY-J2gA27Q)  |          2048          |               128               |   40   |    73.6%    |
-|  Logistic Regression (Adam) |       SimCLR      |   [ResNet-50](https://drive.google.com/open?id=1is1wkBRccHdhSKQnPUTQoaFkVNSaCb35)  |          2048          |               128               |   80   |    76.3%    |
+|  Logistic Regression (Adam) |       SimCLR      |   [ResNet-50](https://drive.google.com/open?id=1TZqBNTFCsO-mxAiR-zJeyupY-J2gA27Q)  |          2048          |               128               |   40   |    74.6%    |
+|  Logistic Regression (Adam) |       SimCLR      |   [ResNet-50](https://drive.google.com/open?id=1is1wkBRccHdhSKQnPUTQoaFkVNSaCb35)  |          2048          |               128               |   80   |    77.3%    |
 
 
