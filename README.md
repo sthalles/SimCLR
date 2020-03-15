@@ -30,7 +30,7 @@ epochs: 40
 # Frequency to eval the similarity score using the validation set
 eval_every_n_epochs: 1
 
-# Specify a folder containing a pre-trained model to fine-tune
+# Specify a folder containing a pre-trained model to fine-tune. If training from scratch, pass None.
 fine_tune_from: 'Mar13_20-12-09_thallessilva'
 
 # Frequency to which tensorboard is updated
