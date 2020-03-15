@@ -79,10 +79,11 @@ Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge
 |:---------------------------:|:-----------------:|:------------:|:----------------------:|:-------------------------------:|:------:|:-----------:|
 |     Logistic Regression     |    PCA Features   |       -      |           256          |                -                |        |    36.0%    |
 |             KNN             |    PCA Features   |       -      |           256          |                -                |        |    31.8%    |
-| Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/file/d/12kKgvo4h41G9qnDdhDnZXFlR5_aqvaVR/view?usp=sharing)  |           512          |               256               |   40   |    70.3%    |
+| Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/open?id=1c4eVon0sUd-ChVhH6XMpF6nCngNJsAPk)  |           512          |               256               |   40   |    70.3%    |
 |             KNN             |       SimCLR      |   ResNet-18  |           512          |               256               |   40   |    66.2%    |
-| Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/open?id=1LjuZ1RmhotrnugprRQc2Exk0EbQHMJhL)  |           512          |               256               |   80   |    72.9%    |
+| Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/open?id=1L0yoeY9i2mzDcj69P4slTWb-cfr3PyoT)  |           512          |               256               |   80   |    72.9%    |
 |             KNN             |       SimCLR      |   ResNet-18  |           512          |               256               |   80   |    69.8%    |
-| Logistic Regression (LBFGS) |       SimCLR      |   ResNet-50  |          2048          |                -                |   40   |      -      |
+|  Logistic Regression (Adam) |       SimCLR      |   [ResNet-50](https://drive.google.com/open?id=1TZqBNTFCsO-mxAiR-zJeyupY-J2gA27Q)  |          2048          |               128               |   40   |    73.6%    |
+|  Logistic Regression (Adam) |       SimCLR      |   [ResNet-50](https://drive.google.com/open?id=1is1wkBRccHdhSKQnPUTQoaFkVNSaCb35)  |          2048          |               128               |   80   |    76.3%    |
 
 
