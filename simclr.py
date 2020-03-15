@@ -60,7 +60,7 @@ class SimCLR(object):
         model = ResNetSimCLR(**self.config["model"]).to(self.device)
         model = self._load_pre_trained_weights(model)
 
-        optimizer = torch.optim.Adam(model.parameters(), 3e-4)
+        optimizer = torch.optim.Adam(model.parameters(), 3e-4, weight_decay=eval(self.config['weight_decay']))
 
         model_checkpoints_folder = os.path.join(self.writer.log_dir, 'checkpoints')
 
