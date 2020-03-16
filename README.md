@@ -36,6 +36,12 @@ fine_tune_from: 'Mar13_20-12-09_thallessilva'
 # Frequency to which tensorboard is updated
 log_every_n_steps: 50
 
+# l2 Weight decay magnitude, original implementation uses 10e-6
+weight_decay: 10e-6
+
+# if True, training is done using mixed precision. Apex needs to be installed in this case.
+fp16_precision: False 
+
 # Model related parameters
 model:
   # Output dimensionality of the embedding vector z. Original implementation uses 2048
