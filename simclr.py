@@ -7,11 +7,15 @@ import os
 import shutil
 import sys
 
+apex_support = False
 try:
     sys.path.append('./apex')
     from apex import amp
+
+    apex_support = True
 except:
-    raise ("Please install apex for mixed precision training")
+    print("Please install apex for mixed precision training from: https://github.com/NVIDIA/apex")
+    apex_support = False
 
 import numpy as np
 
@@ -65,9 +69,10 @@ class SimCLR(object):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader), eta_min=0,
                                                                last_epoch=-1)
 
-        model, optimizer = amp.initialize(model, optimizer,
-                                          opt_level=self.config['opt_level'],
-                                          keep_batchnorm_fp32=True)
+        if apex_support and self.config['fp16_precision']:
+            model, optimizer = amp.initialize(model, optimizer,
+                                              opt_level='O2',
+                                              keep_batchnorm_fp32=True)
 
         model_checkpoints_folder = os.path.join(self.writer.log_dir, 'checkpoints')
 
@@ -90,8 +95,11 @@ class SimCLR(object):
                 if n_iter % self.config['log_every_n_steps'] == 0:
                     self.writer.add_scalar('train_loss', loss, global_step=n_iter)
 
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
+                if apex_support and self.config['fp16_precision']:
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                else:
+                    loss.backward()
 
                 optimizer.step()
                 n_iter += 1
