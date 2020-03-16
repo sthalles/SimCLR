@@ -5,6 +5,14 @@ import torch.nn.functional as F
 from loss.nt_xent import NTXentLoss
 import os
 import shutil
+import sys
+
+try:
+    sys.path.append('./apex')
+    from apex import amp
+except:
+    raise ("Please install apex for mixed precision training")
+
 import numpy as np
 
 torch.manual_seed(0)
@@ -43,13 +51,6 @@ class SimCLR(object):
         zjs = F.normalize(zjs, dim=1)
 
         loss = self.nt_xent_criterion(zis, zjs)
-
-        if n_iter % self.config['log_every_n_steps'] == 0:
-            self.writer.add_histogram("xi_repr", ris, global_step=n_iter)
-            self.writer.add_histogram("xi_latent", zis, global_step=n_iter)
-            self.writer.add_histogram("xj_repr", rjs, global_step=n_iter)
-            self.writer.add_histogram("xj_latent", zjs, global_step=n_iter)
-
         return loss
 
     def train(self):
@@ -63,6 +64,10 @@ class SimCLR(object):
 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader), eta_min=0,
                                                                last_epoch=-1)
+
+        model, optimizer = amp.initialize(model, optimizer,
+                                          opt_level=self.config['opt_level'],
+                                          keep_batchnorm_fp32=True)
 
         model_checkpoints_folder = os.path.join(self.writer.log_dir, 'checkpoints')
 
@@ -85,7 +90,9 @@ class SimCLR(object):
                 if n_iter % self.config['log_every_n_steps'] == 0:
                     self.writer.add_scalar('train_loss', loss, global_step=n_iter)
 
-                loss.backward()
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+
                 optimizer.step()
                 n_iter += 1
 
