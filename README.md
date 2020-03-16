@@ -31,7 +31,7 @@ epochs: 40
 eval_every_n_epochs: 1
 
 # Specify a folder containing a pre-trained model to fine-tune. If training from scratch, pass None.
-fine_tune_from: 'Mar13_20-12-09_thallessilva'
+fine_tune_from: 'resnet-18_80-epochs'
 
 # Frequency to which tensorboard is updated
 log_every_n_steps: 50
