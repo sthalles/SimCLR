@@ -2,10 +2,7 @@
 
 ### Blog post with full documentation: [Exploring SimCLR: A Simple Framework for Contrastive Learning of Visual Representations](https://sthalles.github.io/simple-self-supervised-learning/)
 
-#### For a Tensorflow 2.0 Implementation: [Tensorflow SimCLR](https://github.com/sthalles/SimCLR-tensorflow)
-
 ![Image of SimCLR Arch](https://sthalles.github.io/assets/contrastive-self-supervised/cover.png)
-
 
 ## Installation
 
