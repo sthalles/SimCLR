@@ -7,7 +7,7 @@
 ## Installation
 
 ```
-$ conda create --name simclr python=3.7 --file requirements.txt
+$ conda env create --name simclr --file env.yml
 $ conda activate simclr
 $ python run.py
 ```
