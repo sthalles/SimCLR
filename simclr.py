@@ -138,13 +138,14 @@ class SimCLR(object):
             model.eval()
 
             valid_loss = 0.0
-            for counter, ((xis, xjs), _) in enumerate(valid_loader):
+            counter = 0
+            for (xis, xjs), _ in valid_loader:
                 xis = xis.to(self.device)
                 xjs = xjs.to(self.device)
 
                 loss = self._step(model, xis, xjs, counter)
                 valid_loss += loss.item()
-
+                counter += 1
             valid_loss /= counter
         model.train()
         return valid_loss
