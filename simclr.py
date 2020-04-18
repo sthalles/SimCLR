@@ -145,6 +145,6 @@ class SimCLR(object):
                 loss = self._step(model, xis, xjs, counter)
                 valid_loss += loss.item()
 
-            valid_loss /= counter
+            valid_loss = valid_loss / (counter + 1)
         model.train()
         return valid_loss
