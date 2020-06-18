@@ -4,6 +4,8 @@
 
 ![Image of SimCLR Arch](https://sthalles.github.io/assets/contrastive-self-supervised/cover.png)
 
+See also [PyTorch Implementation for BYOL](https://github.com/sthalles/PyTorch-BYOL).
+
 ## Installation
 
 ```
