@@ -10,18 +10,27 @@ np.random.seed(0)
 
 class DataSetWrapper(object):
 
-    def __init__(self, batch_size, num_workers, valid_size, input_shape, s):
+    def __init__(self, batch_size, num_workers, valid_size, input_shape, s, name):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_size = valid_size
         self.s = s
         self.input_shape = eval(input_shape)
+        self.name = name
 
-    def get_data_loaders(self):
+    def get_dataset(self):
         data_augment = self._get_simclr_pipeline_transform()
 
-        train_dataset = datasets.STL10('./data', split='train+unlabeled', download=True,
-                                       transform=SimCLRDataTransform(data_augment))
+        if self.name == 'stl10':
+            return datasets.STL10('./data', split='train+unlabeled', download=True,
+                                  transform=SimCLRDataTransform(data_augment))
+        elif self.name == 'pascal-voc':
+            return datasets.VOCDetection('./data', image_set='trainval', download=True, transform=SimCLRDataTransform(data_augment), target_transform=NoneTargetTransform())
+        else:
+            raise ValueError('Unsupported dataset name: %s' % self.name)
+
+    def get_data_loaders(self):
+        train_dataset = self.get_dataset()
 
         train_loader, valid_loader = self.get_train_validation_data_loaders(train_dataset)
         return train_loader, valid_loader
@@ -66,3 +75,10 @@ class SimCLRDataTransform(object):
         xi = self.transform(sample)
         xj = self.transform(sample)
         return xi, xj
+
+class NoneTargetTransform(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, target):
+        return 0

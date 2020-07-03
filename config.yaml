@@ -1,4 +1,4 @@
-batch_size: 512
+batch_size: 8
 epochs: 80
 eval_every_n_epochs: 1
 fine_tune_from: None
@@ -11,6 +11,7 @@ model:
   base_model: "resnet18"
 
 dataset:
+  name: "pascal-voc" # or pascal-voc
   s: 1
   input_shape: (96,96,3)
   num_workers: 0
