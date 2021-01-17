@@ -34,6 +34,23 @@ def _save_config_file(model_checkpoints_folder, args):
             yaml.dump(args, outfile, default_flow_style=False)
 
 
+def accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
+
+
 class SimCLR(object):
 
     def __init__(self, *args, **kwargs):
@@ -97,10 +114,10 @@ class SimCLR(object):
                 self.optimizer.step()
 
                 if n_iter % self.args.log_every_n_steps == 0:
-                    predictions = torch.argmax(logits, dim=1)
-                    acc = 100 * (predictions == labels).float().mean()
+                    top1, top5 = accuracy(logits, labels, topk=(1,5))
                     self.writer.add_scalar('loss', loss, global_step=n_iter)
-                    self.writer.add_scalar('acc/top1', acc, global_step=n_iter)
+                    self.writer.add_scalar('acc/top1', top1[0], global_step=n_iter)
+                    self.writer.add_scalar('acc/top5', top5[0], global_step=n_iter)
                     self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=n_iter)
 
                 n_iter += 1
@@ -108,7 +125,7 @@ class SimCLR(object):
             # warmup for the first 10 epochs
             if epoch_counter >= 10:
                 self.scheduler.step()
-            logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}\tTop1 accuracy: {acc}")
+            logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}\tTop1 accuracy: {top1[0]}")
 
         logging.info("Training has finished.")
         # save model checkpoints

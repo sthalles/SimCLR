@@ -2,6 +2,7 @@ from torchvision.transforms import transforms
 from data_aug.gaussian_blur import GaussianBlur
 from torchvision import transforms, datasets
 from data_aug.view_generator import ContrastiveLearningViewGenerator
+from exceptions.exceptions import InvalidDatasetSelection
 
 
 class ContrastiveLearningDataset:
@@ -33,5 +34,9 @@ class ContrastiveLearningDataset:
                                                               n_views),
                                                           download=True)}
 
-        dataset = valid_datasets.get(name, 'Invalid dataset option.')()
-        return dataset
+        try:
+            dataset_fn = valid_datasets[name]
+        except KeyError:
+            raise InvalidDatasetSelection()
+        else:
+            return dataset_fn()
