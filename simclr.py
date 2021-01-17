@@ -35,7 +35,7 @@ class SimCLR(object):
         self.device = self._get_device()
         self.writer = SummaryWriter()
         self.dataset = dataset
-        self.nt_xent_criterion = NTXentLoss(self.device, config['batch_size'], **config['loss'])
+        self.nt_xent_criterion = NTXentLoss(**config['loss'])
 
     def _get_device(self):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
