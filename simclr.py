@@ -1,13 +1,13 @@
 import logging
 import os
-import shutil
 import sys
 
 import torch
 import torch.nn.functional as F
-import yaml
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+
+from utils import save_config_file, accuracy, save_checkpoint
 
 torch.manual_seed(0)
 
@@ -20,36 +20,6 @@ try:
 except:
     print("Please install apex for mixed precision training from: https://github.com/NVIDIA/apex")
     apex_support = False
-
-
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
-
-
-def _save_config_file(model_checkpoints_folder, args):
-    if not os.path.exists(model_checkpoints_folder):
-        os.makedirs(model_checkpoints_folder)
-        with open(os.path.join(model_checkpoints_folder, 'config.yml'), 'w') as outfile:
-            yaml.dump(args, outfile, default_flow_style=False)
-
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
 
 
 class SimCLR(object):
@@ -86,7 +56,7 @@ class SimCLR(object):
                                                         opt_level='O2',
                                                         keep_batchnorm_fp32=True)
         # save config file
-        _save_config_file(self.writer.log_dir, self.args)
+        save_config_file(self.writer.log_dir, self.args)
 
         n_iter = 0
         logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
