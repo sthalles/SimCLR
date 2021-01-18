@@ -26,7 +26,7 @@ $ python run.py -data ./datasets --dataset-name stl10 --log-every-n-steps 100 --
 
 If you want to run it on CPU (for debugging purposes) use the ```--disable-cuda``` option.
 
-For 16-bit precision GPU training, make sure to install [!NVIDIA apex](https://github.com/NVIDIA/apex) and used the ```--fp16_precision``` flag.
+For 16-bit precision GPU training, make sure to install [NVIDIA apex](https://github.com/NVIDIA/apex) and use the ```--fp16_precision``` flag.
 
 ## Feature Evaluation
 
