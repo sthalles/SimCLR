@@ -1,11 +1,12 @@
+import logging
 import os
 import shutil
 import sys
-import yaml
+
 import torch
-from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
-import logging
+import yaml
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 torch.manual_seed(0)
@@ -84,11 +85,8 @@ class SimCLR(object):
             self.model, self.optimizer = amp.initialize(self.model, self.optimizer,
                                                         opt_level='O2',
                                                         keep_batchnorm_fp32=True)
-
-        model_checkpoints_folder = os.path.join(self.writer.log_dir, 'checkpoints')
-
         # save config file
-        _save_config_file(model_checkpoints_folder, self.args)
+        _save_config_file(self.writer.log_dir, self.args)
 
         n_iter = 0
         logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
@@ -114,7 +112,7 @@ class SimCLR(object):
                 self.optimizer.step()
 
                 if n_iter % self.args.log_every_n_steps == 0:
-                    top1, top5 = accuracy(logits, labels, topk=(1,5))
+                    top1, top5 = accuracy(logits, labels, topk=(1, 5))
                     self.writer.add_scalar('loss', loss, global_step=n_iter)
                     self.writer.add_scalar('acc/top1', top1[0], global_step=n_iter)
                     self.writer.add_scalar('acc/top5', top5[0], global_step=n_iter)

@@ -1,10 +1,10 @@
 import argparse
 import torch
+import torch.backends.cudnn as cudnn
 from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
 from models.resnet_simclr import ResNetSimCLR
 from simclr import SimCLR
-import torch.backends.cudnn as cudnn
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -34,8 +34,6 @@ parser.add_argument('--lr', '--learning-rate', default=0.0003, type=float,
 parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)',
                     dest='weight_decay')
-parser.add_argument('--resume', default='', type=str, metavar='PATH',
-                    help='path to latest checkpoint (default: none)')
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--disable-cuda', action='store_true',

@@ -16,78 +16,27 @@ $ python run.py
 
 ## Config file
 
-Before running SimCLR, make sure you choose the correct running configurations on the ```config.yaml``` file.
+Before running SimCLR, make sure you choose the correct running configurations. You can change the running configurations by passing keyword arguments to the ```run.py``` file.
 
-```yaml
+```python
 
-# A batch size of N, produces 2 * (N-1) negative samples. Original implementation uses a batch size of 8192
-batch_size: 512 
+$ python run.py -data ./datasets --dataset-name stl10 --log-every-n-steps 100 --epochs 100 
 
-# Number of epochs to train
-epochs: 40
-
-# Frequency to eval the similarity score using the validation set
-eval_every_n_epochs: 1
-
-# Specify a folder containing a pre-trained model to fine-tune. If training from scratch, pass None.
-fine_tune_from: 'resnet-18_80-epochs'
-
-# Frequency to which tensorboard is updated
-log_every_n_steps: 50
-
-# l2 Weight decay magnitude, original implementation uses 10e-6
-weight_decay: 10e-6
-
-# if True, training is done using mixed precision. Apex needs to be installed in this case.
-fp16_precision: False 
-
-# Model related parameters
-model:
-  # Output dimensionality of the embedding vector z. Original implementation uses 2048
-  out_dim: 256 
-  
-  # The ConvNet base model. Choose one of: "resnet18" or "resnet50". Original implementation uses resnet50
-  base_model: "resnet18"
-
-# Dataset related parameters
-dataset:
-  s: 1
-  
-  # dataset input shape. For datasets containing images of different size, this defines the final 
-  input_shape: (96,96,3) 
-  
-  # Number of workers for the data loader
-  num_workers: 0
-  
-  # Size of the validation set in percentage
-  valid_size: 0.05
-
-# NTXent loss related parameters
-loss:
-  # Temperature parameter for the contrastive objective
-  temperature: 0.5 
-  
-  # Distance metric for contrastive loss. If False, uses dot product. Original implementation uses cosine similarity.
-  use_cosine_similarity: True
 ```
+
+If you want to run it on CPU (for debugging purposes) use the ```--disable-cuda``` option.
 
 ## Feature Evaluation
 
 Feature evaluation is done using a linear model protocol. 
 
-Features are learned using the ```STL10 train+unsupervised``` set and evaluated in the ```test``` set;
+First, we learned features using SimCLR on the ```STL10 unsupervised``` set. Then, we train a linear classifier on top of the frozen features from SimCLR. The linera model is trained on features extracted from the ```STL10 train``` set and evaluated on the ```STL10 test``` set. 
 
-Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/sthalles/SimCLR/blob/master/feature_eval/linear_feature_eval.ipynb) notebook for reproducibility.
+Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/sthalles/SimCLR/blob/simclr-refactor/feature_eval/mini_batch_logistic_regression_evaluator.ipynb) notebook for reproducibility.
 
 
-|      Linear Classifier      | Feature Extractor | Architecture | Feature dimensionality | Projection Head  dimensionality | Epochs | STL10 Top 1 |
-|:---------------------------:|:-----------------:|:------------:|:----------------------:|:-------------------------------:|:------:|:-----------:|
-|     Logistic Regression     |    PCA Features   |       -      |           256          |                -                |        |    36.0%    |
-|             KNN             |    PCA Features   |       -      |           256          |                -                |        |    31.8%    |
-| Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/open?id=1c4eVon0sUd-ChVhH6XMpF6nCngNJsAPk)  |           512          |               256               |   40   |    70.3%    |
-|             KNN             |       SimCLR      |   ResNet-18  |           512          |               256               |   40   |    66.2%    |
-| Logistic Regression (LBFGS) |       SimCLR      |   [ResNet-18](https://drive.google.com/open?id=1L0yoeY9i2mzDcj69P4slTWb-cfr3PyoT)  |           512          |               256               |   80   |    72.9%    |
-|             KNN             |       SimCLR      |   ResNet-18  |           512          |               256               |   80   |    69.8%    |
-| Logistic Regression (Adam) |       SimCLR      |   [ResNet-18](https://drive.google.com/open?id=1aZ12TITXnajZ6QWmS_SDm8Sp8gXNbeCQ)  |           512          |               256               |   100   |    75.4%    |
-|  Logistic Regression (Adam) |       SimCLR      |   [ResNet-50](https://drive.google.com/open?id=1TZqBNTFCsO-mxAiR-zJeyupY-J2gA27Q)  |          2048          |               128               |   40   |    74.6%    |
-|  Logistic Regression (Adam) |       SimCLR      |   [ResNet-50](https://drive.google.com/open?id=1is1wkBRccHdhSKQnPUTQoaFkVNSaCb35)  |          2048          |               128               |   80   |    77.3%    |
+| Linear Classification      | Dataset | Feature Extractor | Architecture                                                                    | Feature dimensionality | Projection Head dimensionality | Epochs | Top 1  |
+|----------------------------|---------|-------------------|---------------------------------------------------------------------------------|------------------------|--------------------------------|--------|--------|
+| Logistic Regression (Adam) | STL10   | SimCLR            | [ResNet-18](https://drive.google.com/open?id=14_nH2FkyKbt61cieQDiSbBVNP8-gtwgF) | 512                    | 128                            | 100    | 70.45  |
+| Logistic Regression (Adam) | CIFAR10 | SimCLR            | [ResNet-18](https://drive.google.com/open?id=1lc2aoVtrAetGn0PnTkOyFzPCIucOJq7C) | 512                    | 128                            | 100    | 64.82  |
+| Logistic Regression (Adam) | STL10   | SimCLR            | [ResNet-50](https://drive.google.com/open?id=1ByTKAUsdm_X7tLcii6oAEl5qFRqRMZSu) | 2048                   | 128                            | 50     | 67.075 |
