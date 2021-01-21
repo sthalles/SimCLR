@@ -55,9 +55,6 @@ class SimCLR(object):
         # select and combine multiple positives
         positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
 
-        # if there is more than one potive (n_views >= 2) combine the multiple positives
-        positives = positives.mean(dim=1).unsqueeze(1)
-
         # select only the negatives the negatives
         negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
 
