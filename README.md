@@ -34,7 +34,7 @@ For 16-bit precision GPU training, make sure to install [NVIDIA apex](https://gi
 
 Feature evaluation is done using a linear model protocol. 
 
-First, we learned features using SimCLR on the ```STL10 unsupervised``` set. Then, we train a linear classifier on top of the frozen features from SimCLR. The linera model is trained on features extracted from the ```STL10 train``` set and evaluated on the ```STL10 test``` set. 
+First, we learned features using SimCLR on the ```STL10 unsupervised``` set. Then, we train a linear classifier on top of the frozen features from SimCLR. The linear model is trained on features extracted from the ```STL10 train``` set and evaluated on the ```STL10 test``` set. 
 
 Check the [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/sthalles/SimCLR/blob/simclr-refactor/feature_eval/mini_batch_logistic_regression_evaluator.ipynb) notebook for reproducibility.
 
