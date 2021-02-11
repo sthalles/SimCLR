@@ -38,7 +38,7 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--disable-cuda', action='store_true',
                     help='Disable CUDA')
-parser.add_argument('--fp16_precision', default=False, type=bool,
+parser.add_argument('--fp16-precision', action='store_true',
                     help='Whether or not to use 16-bit precision GPU training.')
 
 parser.add_argument('--out_dim', default=128, type=int,
