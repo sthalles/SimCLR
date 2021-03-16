@@ -63,7 +63,7 @@ class SimCLR(object):
 
         n_iter = 0
         logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
-        logging.info(f"Training with gpu: {self.args.disable_cuda}.")
+        logging.info(f"Training with gpu: {not self.args.disable_cuda}.")
 
         for epoch_counter in range(self.args.epochs):
             for images, _ in tqdm(train_loader):
