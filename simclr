@@ -1,0 +1,3 @@
+export PATH=/pkgs/anaconda3/bin:$PATH
+export PYTHONPATH=$HOME/condaenvs/simclr:$PYTHONPATH
+export LD_LIBRARY_PATH=/pkgs/cuda-10.1/lib64:/pkgs/cudnn-10.1-v7.6.3.30/lib64:$LD_LIBRARY_PATH
