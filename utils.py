@@ -33,3 +33,32 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
+    
+    
+def load_model_to_steal(folder_name, model, device):
+    def get_file_id_by_model(folder_name):
+        file_id = {'resnet18_100-epochs_stl10': '14_nH2FkyKbt61cieQDiSbBVNP8-gtwgF',
+                   'resnet18_100-epochs_cifar10': '1lc2aoVtrAetGn0PnTkOyFzPCIucOJq7C',
+                   'resnet50_50-epochs_stl10': '1ByTKAUsdm_X7tLcii6oAEl5qFRqRMZSu'}
+        return file_id.get(folder_name, "Model not found.")
+    
+    file_id = get_file_id_by_model(folder_name)
+    print("Stealing model: ", folder_name, file_id)
+    
+    import ipdb; ipdb.set_trace()
+    # download and extract model files
+    os.system('gdown https://drive.google.com/uc?id={}'.format(file_id))
+    os.system('unzip {}'.format(folder_name))
+    
+    checkpoint = torch.load('checkpoint_0100.pth.tar', map_location=device)
+    state_dict = checkpoint['state_dict']
+
+    for k in list(state_dict.keys()):
+        if k.startswith('backbone.'):
+            if k.startswith('backbone') and not k.startswith('backbone.fc'):
+                # remove prefix
+                state_dict[k[len("backbone."):]] = state_dict[k]
+        del state_dict[k]
+        
+    log = model.load_state_dict(state_dict, strict=False)
+    return model
