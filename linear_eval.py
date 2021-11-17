@@ -6,22 +6,31 @@ import yaml
 import matplotlib.pyplot as plt
 import torchvision
 
-# !pip install gdown
+folder_name = resnet18_100-epochs_cifar10
 
-def get_file_id_by_model(folder_name):
-    file_id = {'resnet18_100-epochs_stl10': '14_nH2FkyKbt61cieQDiSbBVNP8-gtwgF',
-             'resnet18_100-epochs_cifar10': '1lc2aoVtrAetGn0PnTkOyFzPCIucOJq7C',
-             'resnet50_50-epochs_stl10': '1ByTKAUsdm_X7tLcii6oAEl5qFRqRMZSu'}
-    return file_id.get(folder_name, "Model not found.")
+def load_model_to_steal(folder_name, model, device):
+    def get_file_id_by_model(folder_name):
+        file_id = {'resnet18_100-epochs_stl10': '14_nH2FkyKbt61cieQDiSbBVNP8-gtwgF',
+                   'resnet18_100-epochs_cifar10': '1lc2aoVtrAetGn0PnTkOyFzPCIucOJq7C',
+                   'resnet50_50-epochs_stl10': '1ByTKAUsdm_X7tLcii6oAEl5qFRqRMZSu'}
+        return file_id.get(folder_name, "Model not found.")
+    
+    file_id = get_file_id_by_model(folder_name)
+    print("Loading stolen model: ", folder_name, file_id)
+    
+    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
+    state_dict = checkpoint['state_dict']
 
-folder_name = 'resnet50_50-epochs_stl10'
-file_id = get_file_id_by_model(folder_name)
-print(folder_name, file_id)
-
-# download and extract model files
-os.system('gdown https://drive.google.com/uc?id={}'.format(file_id))
-os.system('unzip {}'.format(folder_name))
-# !ls
+    for k in list(state_dict.keys()):
+        if k.startswith('backbone.'):
+            if k.startswith('backbone') and not k.startswith('backbone.fc'):
+                # remove prefix
+                state_dict[k[len("backbone."):]] = state_dict[k]
+        del state_dict[k]
+        
+    log = model.load_state_dict(state_dict, strict=False)
+    assert log.missing_keys == ['fc.weight', 'fc.bias']
+    return model
 
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
@@ -32,28 +41,28 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Using device:", device)
 
 def get_stl10_data_loaders(download, shuffle=False, batch_size=256):
-    train_dataset = datasets.STL10('./data', split='train', download=download,
+    train_dataset = datasets.STL10('/ssd003/home/nikita/datasets/', split='train', download=download,
                                   transform=transforms.ToTensor())
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
                             num_workers=0, drop_last=False, shuffle=shuffle)
-    test_dataset = datasets.STL10('./data', split='test', download=download,
+    test_dataset = datasets.STL10('/ssd003/home/nikita/datasets/', split='test', download=download,
                                   transform=transforms.ToTensor())
     test_loader = DataLoader(test_dataset, batch_size=2*batch_size,
                             num_workers=10, drop_last=False, shuffle=shuffle)
     return train_loader, test_loader
 
 def get_cifar10_data_loaders(download, shuffle=False, batch_size=256):
-    train_dataset = datasets.CIFAR10('./data', train=True, download=download,
+    train_dataset = datasets.CIFAR10('/ssd003/home/nikita/datasets/cifar10/', train=True, download=download,
                                   transform=transforms.ToTensor())
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
                             num_workers=0, drop_last=False, shuffle=shuffle)
-    test_dataset = datasets.CIFAR10('./data', train=False, download=download,
+    test_dataset = datasets.CIFAR10('/ssd003/home/nikita/datasets/cifar10/', train=False, download=download,
                                   transform=transforms.ToTensor())
     test_loader = DataLoader(test_dataset, batch_size=2*batch_size,
                             num_workers=10, drop_last=False, shuffle=shuffle)
     return train_loader, test_loader
 
-with open(os.path.join('./config.yml')) as file:
+with open(os.path.join('/ssd003/home/nikita/SimCLR/runs/{}/config.yml'.format(folder_name)) as file:
     config = yaml.load(file)
 
 if config.arch == 'resnet18':
@@ -61,18 +70,7 @@ if config.arch == 'resnet18':
 elif config.arch == 'resnet50':
     model = torchvision.models.resnet50(pretrained=False, num_classes=10).to(device)
 
-checkpoint = torch.load('checkpoint_0040.pth.tar', map_location=device)
-state_dict = checkpoint['state_dict']
-
-for k in list(state_dict.keys()):
-    if k.startswith('backbone.'):
-        if k.startswith('backbone') and not k.startswith('backbone.fc'):
-            # remove prefix
-            state_dict[k[len("backbone."):]] = state_dict[k]
-    del state_dict[k]
-
-log = model.load_state_dict(state_dict, strict=False)
-assert log.missing_keys == ['fc.weight', 'fc.bias']
+model = load_model_to_steal(folder_name, model, device=device)
 
 if config.dataset_name == 'cifar10':
     train_loader, test_loader = get_cifar10_data_loaders(download=True)
