@@ -6,7 +6,9 @@ import yaml
 import matplotlib.pyplot as plt
 import torchvision
 
-folder_name = resnet18_100-epochs_cifar10
+folder_name = 'resnet18_100-epochs_cifar10'
+arch = 'resnet18'
+dataset_name = 'cifar10'
 
 def load_model_to_steal(folder_name, model, device):
     def get_file_id_by_model(folder_name):
@@ -62,21 +64,19 @@ def get_cifar10_data_loaders(download, shuffle=False, batch_size=256):
                             num_workers=10, drop_last=False, shuffle=shuffle)
     return train_loader, test_loader
 
-with open(os.path.join('/ssd003/home/nikita/SimCLR/runs/{}/config.yml'.format(folder_name)) as file:
-    config = yaml.load(file)
 
-if config.arch == 'resnet18':
+if arch == 'resnet18':
     model = torchvision.models.resnet18(pretrained=False, num_classes=10).to(device)
-elif config.arch == 'resnet50':
+elif arch == 'resnet50':
     model = torchvision.models.resnet50(pretrained=False, num_classes=10).to(device)
 
 model = load_model_to_steal(folder_name, model, device=device)
 
-if config.dataset_name == 'cifar10':
+if dataset_name == 'cifar10':
     train_loader, test_loader = get_cifar10_data_loaders(download=True)
-elif config.dataset_name == 'stl10':
+elif dataset_name == 'stl10':
     train_loader, test_loader = get_stl10_data_loaders(download=True)
-print("Dataset:", config.dataset_name)
+print("Dataset:", dataset_name)
 
 # freeze all layers but the last fc
 for name, param in model.named_parameters():
