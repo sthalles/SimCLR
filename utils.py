@@ -3,7 +3,7 @@ import shutil
 
 import torch
 import yaml
-
+import gdown
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
@@ -45,12 +45,11 @@ def load_model_to_steal(folder_name, model, device):
     file_id = get_file_id_by_model(folder_name)
     print("Stealing model: ", folder_name, file_id)
     
-    import ipdb; ipdb.set_trace()
     # download and extract model files
-    os.system('gdown https://drive.google.com/uc?id={}'.format(file_id))
-    os.system('unzip {}'.format(folder_name))
-    
-    checkpoint = torch.load('checkpoint_0100.pth.tar', map_location=device)
+    # url = 'https://drive.google.com/uc?id={}'.format(file_id)
+    # output = 'checkpoint_0100.pth.tar'
+    # gdown.download(url, output, quiet=False)
+    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
     state_dict = checkpoint['state_dict']
 
     for k in list(state_dict.keys()):
