@@ -6,7 +6,7 @@ import yaml
 import matplotlib.pyplot as plt
 import torchvision
 
-folder_name = 'resnet18_100-epochs_cifar10'
+folder_name = 'Nov18_12-45-17_gpu058'
 arch = 'resnet18'
 dataset_name = 'cifar10'
 
@@ -18,9 +18,9 @@ def load_model_to_steal(folder_name, model, device):
         return file_id.get(folder_name, "Model not found.")
     
     file_id = get_file_id_by_model(folder_name)
-    print("Loading stolen model: ", folder_name, file_id)
+    print("Loading stolen model: ", folder_name)
     
-    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
+    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/stolen_checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
     state_dict = checkpoint['state_dict']
 
     for k in list(state_dict.keys()):
