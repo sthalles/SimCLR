@@ -14,12 +14,12 @@ torch.manual_seed(0)
 
 class SimCLR(object):
 
-    def __init__(self, stealing=False, model_to_steal=None, *args, **kwargs):
+    def __init__(self, stealing=False, model_to_steal=None, logdir='', *args, **kwargs):
         self.args = kwargs['args']
         self.model = kwargs['model'].to(self.args.device)
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
-        self.writer = SummaryWriter()
+        self.writer = SummaryWriter(log_dir='runs/'+logdir)
         logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
         self.stealing = stealing

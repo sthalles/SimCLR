@@ -54,6 +54,7 @@ parser.add_argument('--n-views', default=2, type=int, metavar='N',
                             help='Number of views for contrastive learning training.')
 parser.add_argument('--gpu-index', default=0, type=int, help='Gpu index.')
 parser.add_argument('--folder_name', default='resnet18_100-epochs_cifar10', type=str, help='Pretrained SimCLR model to steal.')
+parser.add_argument('--logdir', default='stolen_resnet18_100-epochs_cifar10', type=str, help='Log directory to save output to.')
 
 def main():
     args = parser.parse_args()
@@ -86,7 +87,7 @@ def main():
 
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
     with torch.cuda.device(args.gpu_index):
-        simclr = SimCLR(stealing=True, model_to_steal=model_to_steal, model=model, optimizer=optimizer, scheduler=scheduler, args=args)
+        simclr = SimCLR(stealing=True, model_to_steal=model_to_steal, model=model, optimizer=optimizer, scheduler=scheduler, args=args, logdir=args.logdir)
         simclr.steal(train_loader, args.num_queries)
 
 
