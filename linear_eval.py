@@ -5,10 +5,18 @@ import os
 import yaml
 import matplotlib.pyplot as plt
 import torchvision
+import argparse
 
-folder_name = 'Nov18_12-45-17_gpu058'
-arch = 'resnet18'
-dataset_name = 'cifar10'
+parser = argparse.ArgumentParser(description='PyTorch SimCLR')
+parser.add_argument('-folder-name', metavar='DIR', default='test',
+                    help='path to dataset')
+parser.add_argument('-dataset-name', default='cifar10',
+                    help='dataset name', choices=['stl10', 'cifar10'])
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
+                    choices=model_names,
+                    help='model architecture: ' +
+                         ' | '.join(model_names) +
+                         ' (default: resnet50)')
 
 def load_model_to_steal(folder_name, model, device):
     def get_file_id_by_model(folder_name):
@@ -65,18 +73,18 @@ def get_cifar10_data_loaders(download, shuffle=False, batch_size=256):
     return train_loader, test_loader
 
 
-if arch == 'resnet18':
+if args.arch == 'resnet18':
     model = torchvision.models.resnet18(pretrained=False, num_classes=10).to(device)
-elif arch == 'resnet50':
+elif args.arch == 'resnet50':
     model = torchvision.models.resnet50(pretrained=False, num_classes=10).to(device)
 
-model = load_model_to_steal(folder_name, model, device=device)
+model = load_model_to_steal(args.folder_name, model, device=device)
 
-if dataset_name == 'cifar10':
+if args.dataset_name == 'cifar10':
     train_loader, test_loader = get_cifar10_data_loaders(download=True)
-elif dataset_name == 'stl10':
+elif args.dataset_name == 'stl10':
     train_loader, test_loader = get_stl10_data_loaders(download=True)
-print("Dataset:", dataset_name)
+print("Dataset:", args.dataset_name)
 
 # freeze all layers but the last fc
 for name, param in model.named_parameters():
