@@ -24,12 +24,12 @@ class SimCLR(object):
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
         self.stealing = stealing
         if self.stealing:
-            self.criterion = torch.nn.MSELoss().to(self.args.device)
+            # self.criterion = torch.nn.MSELoss().to(self.args.device)
             self.model_to_steal = model_to_steal.to(self.args.device)
 
     def info_nce_loss(self, features):
 
-        labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
+        labels = torch.cat([torch.arange(self.args.batch_size) for i in range(2)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
         labels = labels.to(self.args.device)
 
@@ -135,8 +135,9 @@ class SimCLR(object):
                 with autocast(enabled=self.args.fp16_precision):
                     query_features = self.model_to_steal(images)
                     features = self.model(images)
-                    loss = self.criterion(query_features, features)
-                    logits, labels = self.info_nce_loss(query_features)
+                    all_features = torch.cat([features, query_features], dim=0)
+                    logits, labels = self.info_nce_loss(all_features)
+                    loss = self.criterion(logits, labels)
 
                 self.optimizer.zero_grad()
 

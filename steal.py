@@ -50,11 +50,11 @@ parser.add_argument('--temperature', default=0.07, type=float,
                     help='softmax temperature (default: 0.07)')
 parser.add_argument('--num_queries', default=1000, type=int, metavar='N',
                     help='Number of queries to steal the model.')
-parser.add_argument('--n-views', default=2, type=int, metavar='N',
+parser.add_argument('--n-views', default=1, type=int, metavar='N',
                             help='Number of views for contrastive learning training.')
 parser.add_argument('--gpu-index', default=0, type=int, help='Gpu index.')
 parser.add_argument('--folder_name', default='resnet18_100-epochs_cifar10', type=str, help='Pretrained SimCLR model to steal.')
-parser.add_argument('--logdir', default='stolen_resnet18_100-epochs_cifar10', type=str, help='Log directory to save output to.')
+parser.add_argument('--logdir', default='test', type=str, help='Log directory to save output to.')
 
 def main():
     args = parser.parse_args()
