@@ -12,11 +12,10 @@ parser.add_argument('-folder-name', metavar='DIR', default='test',
                     help='path to dataset')
 parser.add_argument('-dataset-name', default='cifar10',
                     help='dataset name', choices=['stl10', 'cifar10'])
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
-                    choices=model_names,
-                    help='model architecture: ' +
-                         ' | '.join(model_names) +
-                         ' (default: resnet50)')
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18', 
+        choices=['resnet18', 'resnet50'], help='model architecture')
+
+args = parser.parse_args()
 
 def load_model_to_steal(folder_name, model, device):
     def get_file_id_by_model(folder_name):
@@ -28,7 +27,7 @@ def load_model_to_steal(folder_name, model, device):
     file_id = get_file_id_by_model(folder_name)
     print("Loading stolen model: ", folder_name)
     
-    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/stolen_checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
+    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/stolen_checkpoint_0600.pth.tar'.format(folder_name), map_location=device)
     state_dict = checkpoint['state_dict']
 
     for k in list(state_dict.keys()):
