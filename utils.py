@@ -49,7 +49,7 @@ def load_model_to_steal(folder_name, model, device):
     # url = 'https://drive.google.com/uc?id={}'.format(file_id)
     # output = 'checkpoint_0100.pth.tar'
     # gdown.download(url, output, quiet=False)
-    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
+    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/checkpoint_0040.pth.tar'.format(folder_name), map_location=device)
     state_dict = checkpoint['state_dict']
 
     for k in list(state_dict.keys()):

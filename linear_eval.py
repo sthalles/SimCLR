@@ -14,6 +14,8 @@ parser.add_argument('-dataset-name', default='cifar10',
                     help='dataset name', choices=['stl10', 'cifar10'])
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18', 
         choices=['resnet18', 'resnet50'], help='model architecture')
+parser.add_argument('-n', '--num-labeled', default=500,
+                     help='Number of labeled examples to train on')
 
 args = parser.parse_args()
 
@@ -27,7 +29,7 @@ def load_model_to_steal(folder_name, model, device):
     file_id = get_file_id_by_model(folder_name)
     print("Loading stolen model: ", folder_name)
     
-    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/stolen_checkpoint_0600.pth.tar'.format(folder_name), map_location=device)
+    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/stolen_checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
     state_dict = checkpoint['state_dict']
 
     for k in list(state_dict.keys()):
@@ -50,11 +52,11 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Using device:", device)
 
 def get_stl10_data_loaders(download, shuffle=False, batch_size=256):
-    train_dataset = datasets.STL10('/ssd003/home/nikita/datasets/', split='train', download=download,
+    train_dataset = datasets.STL10('/ssd003/home/nikita/mydata/', split='train', download=download,
                                   transform=transforms.ToTensor())
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
                             num_workers=0, drop_last=False, shuffle=shuffle)
-    test_dataset = datasets.STL10('/ssd003/home/nikita/datasets/', split='test', download=download,
+    test_dataset = datasets.STL10('/ssd003/home/nikita/mydata/', split='test', download=download,
                                   transform=transforms.ToTensor())
     test_loader = DataLoader(test_dataset, batch_size=2*batch_size,
                             num_workers=10, drop_last=False, shuffle=shuffle)
@@ -128,6 +130,9 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
+        if counter+1 == args.num_labeled:
+            break;
     
     top1_train_accuracy /= (counter + 1)
     top1_accuracy = 0
