@@ -35,7 +35,7 @@ def accuracy(output, target, topk=(1,)):
         return res
     
     
-def load_model_to_steal(folder_name, model, device):
+def load_model_to_steal(folder_name, model, device, discard_mlp=False):
     def get_file_id_by_model(folder_name):
         file_id = {'resnet18_100-epochs_stl10': '14_nH2FkyKbt61cieQDiSbBVNP8-gtwgF',
                    'resnet18_100-epochs_cifar10': '1lc2aoVtrAetGn0PnTkOyFzPCIucOJq7C',
@@ -52,12 +52,13 @@ def load_model_to_steal(folder_name, model, device):
     checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
     state_dict = checkpoint['state_dict']
 
-    for k in list(state_dict.keys()):
-        if k.startswith('backbone.'):
-            if k.startswith('backbone') and not k.startswith('backbone.fc'):
-                # remove prefix
-                state_dict[k[len("backbone."):]] = state_dict[k]
-        del state_dict[k]
+    if discard_mlp:
+        for k in list(state_dict.keys()):
+            if k.startswith('backbone.'):
+                if k.startswith('backbone') and not k.startswith('backbone.fc'):
+                    # remove prefix
+                    state_dict[k[len("backbone."):]] = state_dict[k]
+            del state_dict[k]
         
     log = model.load_state_dict(state_dict, strict=False)
     return model
