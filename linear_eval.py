@@ -14,7 +14,7 @@ parser.add_argument('-dataset-name', default='cifar10',
                     help='dataset name', choices=['stl10', 'cifar10'])
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18', 
         choices=['resnet18', 'resnet50'], help='model architecture')
-parser.add_argument('-n', '--num-labeled', default=500,
+parser.add_argument('-n', '--num-labeled', default=100,
                      help='Number of labeled examples to train on')
 
 args = parser.parse_args()
