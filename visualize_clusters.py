@@ -1,10 +1,30 @@
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import seaborn as sns
+from models.resnet_simclr import ResNetSimCLR
 import argparse
 import torch
-import torch.backends.cudnn as cudnn
-from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
-from models.resnet_simclr import ResNetSimCLR
-from simclr import SimCLR
+from tqdm import tqdm
+from torchvision import models
+import os
+import yaml
+
+def _load_pre_trained_weights(model):
+        try:
+            file = open(r'config.yaml')
+            cfg = yaml.load(file, Loader=yaml.FullLoader)
+            checkpoints_folder = os.path.join('./runs', cfg['folder'])
+            checkpoint = torch.load(os.path.join(checkpoints_folder, cfg['model']))
+            model.load_state_dict(checkpoint['state_dict'])
+            print("Loaded pre-trained model with success.")
+        except FileNotFoundError:
+            print("Pre-trained weights not found. Training from scratch.")
+
+        return model
+
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -14,7 +34,7 @@ parser = argparse.ArgumentParser(description='PyTorch SimCLR')
 parser.add_argument('-data', metavar='DIR', default='./datasets',
                     help='path to dataset')
 parser.add_argument('-dataset-name', default='stl10',
-                    help='dataset name', choices=['stl10', 'cifar10', 'mnist'])
+                    help='dataset name', choices=['stl10', 'cifar10'])
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -50,42 +70,57 @@ parser.add_argument('--temperature', default=0.07, type=float,
 parser.add_argument('--n-views', default=2, type=int, metavar='N',
                     help='Number of views for contrastive learning training.')
 parser.add_argument('--gpu-index', default=0, type=int, help='Gpu index.')
-parser.add_argument('--level_number', default=3, type=int, help='Number of nodes of the binary tree')
-parser.add_argument("--loss_at_all_level", default=False, action="store_true",
-                    help="Flag to do something")
 
-def main():
-    args = parser.parse_args()
-    assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
-    # check if gpu training is available
-    if not args.disable_cuda and torch.cuda.is_available():
-        args.device = torch.device('cuda')
-        cudnn.deterministic = True
-        cudnn.benchmark = True
-    else:
-        args.device = torch.device('cpu')
-        args.gpu_index = -1
 
-    dataset = ContrastiveLearningDataset(args.data)
 
-    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views)
 
-    train_loader = torch.utils.data.DataLoader(
+
+def plot():
+        
+    def _plot(v, labels, centroids, fname):
+        fig = plt.figure(figsize=(10, 10))
+        plt.axis('off')
+        sns.set_style("darkgrid")
+        sns.scatterplot(x=v[:, 0], y=v[:, 1], hue=labels, legend='full', palette=sns.color_palette("bright", 10))
+        sns.scatterplot(x=centroids[:, 0], y=centroids[:, 1], marker='x')
+        plt.legend(list(range(10)))
+        plt.savefig(fname)
+        plt.close()
+        
+        
+            
+    with torch.no_grad():
+        args = parser.parse_args()  
+        dataset = ContrastiveLearningDataset(args.data)
+
+        train_dataset = dataset.get_dataset(args.dataset_name, args.n_views)
+
+        train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True, drop_last=True)
+            
+        ResnetsimCLR = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim).cpu()
+            
+        ResnetsimCLR = _load_pre_trained_weights(ResnetsimCLR)
+        
+        kmeans = KMeans(n_clusters=10)
+        pca = PCA(n_components=2)
+        tsne = TSNE(n_components=2)
 
-    model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim, args=args)
-
-    optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader), eta_min=0,
-                                                           last_epoch=-1)
-
-    #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
-    with torch.cuda.device(args.gpu_index):
-        simclr = SimCLR(model=model, optimizer=optimizer, scheduler=scheduler, args=args)
-        simclr.train(train_loader)
-
-
+        ResnetsimCLR.eval()
+        x = []  
+        y_ = []
+        for (xis, xjs), target in tqdm(train_loader):
+            ris = ResnetsimCLR(xjs)  # [N,C]
+            x.append(ris.cpu())
+            y_.append(target.cpu())
+        y = torch.stack(y_).cpu().view(-1)
+        x = torch.stack(x).cpu().view(-1, args.out_dim)
+        x = tsne.fit_transform(x)
+        y_tsne = kmeans.fit_transform(pca.fit_transform(x))
+        _plot(x, y, kmeans.cluster_centers_, 'cluster.png')
+            
 if __name__ == "__main__":
-    main()
+    print("Calling Main()...")
+    plot()
+    print("Plot saved...")

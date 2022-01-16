@@ -13,6 +13,7 @@ class ContrastiveLearningDataset:
     def get_simclr_pipeline_transform(size, s=1):
         """Return a set of data augmentation transformations as described in the SimCLR paper."""
         color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+        
         data_transforms = transforms.Compose([transforms.RandomResizedCrop(size=size),
                                               transforms.RandomHorizontalFlip(),
                                               transforms.RandomApply([color_jitter], p=0.8),
@@ -32,7 +33,21 @@ class ContrastiveLearningDataset:
                                                           transform=ContrastiveLearningViewGenerator(
                                                               self.get_simclr_pipeline_transform(96),
                                                               n_views),
-                                                          download=True)}
+                                                          download=True),
+                          
+                          'mnist': lambda: datasets.MNIST(self.root_folder, train=True,
+                                                         transform=ContrastiveLearningViewGenerator(
+                                                              transforms.Compose([
+                                                                    transforms.ToTensor(),
+                                                                    transforms.GaussianBlur(1, sigma=(0.1, 2.0)),
+                                                                    # transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3), value=0, inplace=False),
+                                                                    transforms.RandomAffine(degrees=15,
+                                                                                            translate=[0.1, 0.1],
+                                                                                            scale=[0.9, 1.1],
+                                                                                            shear=15),
+                                                                ]),
+                                                                                                    n_views),
+                                                              download=True)}
 
         try:
             dataset_fn = valid_datasets[name]
