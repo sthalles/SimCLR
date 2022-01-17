@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import torchvision
 import argparse
 
+from models.resnet_simclr import MLP
+
 parser = argparse.ArgumentParser(description='PyTorch SimCLR')
 parser.add_argument('-folder-name', metavar='DIR', default='test',
                     help='path to dataset')
@@ -19,7 +21,7 @@ parser.add_argument('-n', '--num-labeled', default=100,
 
 args = parser.parse_args()
 
-def load_model_to_steal(folder_name, model, device):
+def load_model_to_steal(folder_name, model, mlp, device):
     def get_file_id_by_model(folder_name):
         file_id = {'resnet18_100-epochs_stl10': '14_nH2FkyKbt61cieQDiSbBVNP8-gtwgF',
                    'resnet18_100-epochs_cifar10': '1lc2aoVtrAetGn0PnTkOyFzPCIucOJq7C',
@@ -31,6 +33,7 @@ def load_model_to_steal(folder_name, model, device):
     
     checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/stolen_checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
     state_dict = checkpoint['state_dict']
+    mlp_state_dict = checkpoint['mlp_state_dict']
 
     for k in list(state_dict.keys()):
         if k.startswith('backbone.'):
@@ -40,8 +43,9 @@ def load_model_to_steal(folder_name, model, device):
         del state_dict[k]
         
     log = model.load_state_dict(state_dict, strict=False)
+    mlp_model.load_state_dict(mlp_state_dict)
     assert log.missing_keys == ['fc.weight', 'fc.bias']
-    return model
+    return model, mlp
 
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
@@ -60,7 +64,7 @@ def get_stl10_data_loaders(download, shuffle=False, batch_size=256):
                                   transform=transforms.ToTensor())
     test_loader = DataLoader(test_dataset, batch_size=2*batch_size,
                             num_workers=10, drop_last=False, shuffle=shuffle)
-    return train_loader, test_loader
+    return train_loader, test_loader, watermark_loader
 
 def get_cifar10_data_loaders(download, shuffle=False, batch_size=256):
     train_dataset = datasets.CIFAR10('/ssd003/home/nikita/datasets/cifar10/', train=True, download=download,
@@ -79,7 +83,8 @@ if args.arch == 'resnet18':
 elif args.arch == 'resnet50':
     model = torchvision.models.resnet50(pretrained=False, num_classes=10).to(device)
 
-model = load_model_to_steal(args.folder_name, model, device=device)
+mlp = MLP(128, 2)
+model, mlp = load_model_to_steal(args.folder_name, model, device=device)
 
 if args.dataset_name == 'cifar10':
     train_loader, test_loader = get_cifar10_data_loaders(download=True)
@@ -150,4 +155,7 @@ for epoch in range(epochs):
     top1_accuracy /= (counter + 1)
     top5_accuracy /= (counter + 1)
     print(f"Epoch {epoch}\tTop1 Train accuracy {top1_train_accuracy.item()}\tTop1 Test accuracy: {top1_accuracy.item()}\tTop5 test acc: {top5_accuracy.item()}")
+
+
+
 

@@ -2,8 +2,8 @@ import argparse
 import torch
 import torch.backends.cudnn as cudnn
 from torchvision import models
-from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, RegularDataset
-from models.resnet_simclr import ResNetSimCLR
+from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, RegularDatase, WatermarkDataset
+from models.resnet_simclr import ResNetSimCLR, MLP
 from simclr import SimCLR
 from utils import load_model_to_steal
 
@@ -76,8 +76,14 @@ def main():
         train_dataset, batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True, drop_last=True)
 
+    watermark_dataset = WatermarkDataset(args.data).get_dataset(args.dataset_name, args.n_views)
+    watermark_loader = torch.utils.data.DataLoader(
+        watermark_dataset, batch_size=args.batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True, drop_last=True)
+
     model_to_steal = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim).to(args.device)
-    model_to_steal = load_model_to_steal(args.folder_name, model_to_steal, device=args.device)
+    victim_mlp = MLP(args.out_dim, 2)
+    model_to_steal, victim_mlp = load_model_to_steal(args.folder_name, model_to_steal, victim_mlp, device=args.device)
     model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim)
     
     optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
@@ -87,8 +93,8 @@ def main():
 
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
     with torch.cuda.device(args.gpu_index):
-        simclr = SimCLR(stealing=True, model_to_steal=model_to_steal, model=model, optimizer=optimizer, scheduler=scheduler, args=args, logdir=args.logdir)
-        simclr.steal(train_loader, args.num_queries)
+        simclr = SimCLR(stealing=True, model_to_steal=model_to_steal, model=model, victim_mlp=victim_mlp, optimizer=optimizer, scheduler=scheduler, args=args, logdir=args.logdir)
+        simclr.steal(train_loader, watermark_loader, args.num_queries)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 from torchvision.transforms import transforms
 from data_aug.gaussian_blur import GaussianBlur
 from torchvision import transforms, datasets
-from data_aug.view_generator import ContrastiveLearningViewGenerator
+from data_aug.view_generator import ContrastiveLearningViewGenerator, WatermarkViewGenerator
 from exceptions.exceptions import InvalidDatasetSelection
 
 
@@ -68,6 +68,40 @@ class RegularDataset:
                           'stl10': lambda: datasets.STL10(self.root_folder, split='unlabeled',
                                                           transform=ContrastiveLearningViewGenerator(
                                                               self.get_simclr_pipeline_transform(96),
+                                                              n_views),
+                                                          download=True)}
+
+        try:
+            dataset_fn = valid_datasets[name]
+        except KeyError:
+            raise InvalidDatasetSelection()
+        else:
+            return dataset_fn()
+
+
+
+class WatermarkDataset:
+    def __init__(self, root_folder):
+        self.root_folder = root_folder
+
+    @staticmethod
+    def get_transform():
+        data_transform1 = transforms.Compose([transforms.RandomRotation(degrees=(0, 180)),
+                                              transforms.ToTensor()])
+        data_transform2 = transforms.Compose([transforms.RandomRotation(degrees=(180, 360)),
+                                              transforms.ToTensor()])
+        return [data_transform1, data_transform2]
+
+    def get_dataset(self, name, n_views):
+        valid_datasets = {'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
+                                                              transform=WatermarkViewGenerator(
+                                                                  self.get_transform(),
+                                                                  n_views),
+                                                              download=True),
+
+                          'stl10': lambda: datasets.STL10(self.root_folder, split='unlabeled',
+                                                          transform=WatermarkViewGenerator(
+                                                              self.get_transform(),
                                                               n_views),
                                                           download=True)}
 

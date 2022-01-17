@@ -2,8 +2,8 @@ import argparse
 import torch
 import torch.backends.cudnn as cudnn
 from torchvision import models
-from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
-from models.resnet_simclr import ResNetSimCLR
+from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WatermarkDataset
+from models.resnet_simclr import ResNetSimCLR, MLP
 from simclr import SimCLR
 
 model_names = sorted(name for name in models.__dict__
@@ -72,17 +72,24 @@ def main():
         train_dataset, batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True, drop_last=True)
 
-    model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim)
 
-    optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
+    watermark_dataset = WatermarkDataset(args.data).get_dataset(args.dataset_name, args.n_views)
+    watermark_loader = torch.utils.data.DataLoader(
+        watermark_dataset, batch_size=args.batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True, drop_last=True)
+
+    model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim)
+    mlp = MLP(args.out_dim, 2)
+
+    optimizer = torch.optim.Adam(list(model.parameters()) + list(mlp.parameters()), args.lr, weight_decay=args.weight_decay)
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader), eta_min=0,
                                                            last_epoch=-1)
 
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
     with torch.cuda.device(args.gpu_index):
-        simclr = SimCLR(model=model, optimizer=optimizer, scheduler=scheduler, args=args)
-        simclr.train(train_loader)
+        simclr = SimCLR(model=model, mlp=mlp, optimizer=optimizer, scheduler=scheduler, args=args)
+        simclr.train(train_loader, watermark_loader)
 
 
 if __name__ == "__main__":
