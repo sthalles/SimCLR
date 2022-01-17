@@ -8,6 +8,7 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from utils import save_config_file, accuracy, save_checkpoint
+from loss import soft_nn_loss, pairwise_euclid_distance
 from pytorch_stats_loss import WassersteinLoss
 
 torch.manual_seed(0)
@@ -25,6 +26,7 @@ class SimCLR(object):
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
         self.stealing = stealing
         if self.stealing:
+            self.soft_nn_loss = soft_nn_loss
             self.mse = torch.nn.MSELoss().to(self.args.device)
             self.wasserstein = WassersteinLoss().to(self.args.device)
             self.model_to_steal = model_to_steal.to(self.args.device)
@@ -139,7 +141,7 @@ class SimCLR(object):
                     features = self.model(images)
                     all_features = torch.cat([features, query_features], dim=0)
                     logits, labels = self.info_nce_loss(all_features)
-                    loss = self.wasserstein(features, query_features)
+                    loss = soft_nn_loss(self.args, all_features, pairwise_euclid_distance, 100)
                     # loss = self.mse(features, query_features)
                     # loss = self.criterion(logits, labels)
 
