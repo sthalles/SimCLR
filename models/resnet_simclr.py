@@ -40,3 +40,22 @@ class ResNetSimCLR(nn.Module):
         x = torch.flatten(x, 1)
         # x = self.backbone.fc(x)
         return x #self.backbone(x)
+
+
+class MLP(nn.Module):
+
+    def __init__(self, n_inputs, n_outputs):
+        super(MLP, self).__init__()
+        self.input = nn.Linear(n_inputs, 256)
+        self.hidden = nn.Linear(256, 128)
+        self.output = nn.Linear(128, n_outputs)
+        self.n_outputs = n_outputs
+
+    def forward(self, x):
+        x = self.input(x)
+        x = self.dropout(x)
+        x = F.relu(x)
+        x = self.hidden(x)
+        x = F.relu(x)
+        x = self.output(x)
+        return x

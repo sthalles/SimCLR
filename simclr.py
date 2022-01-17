@@ -16,9 +16,10 @@ torch.manual_seed(0)
 
 class SimCLR(object):
 
-    def __init__(self, stealing=False, model_to_steal=None, logdir='', *args, **kwargs):
+    def __init__(self, stealing=False, model_to_steal=None, victim_mlp=None, logdir='', *args, **kwargs):
         self.args = kwargs['args']
         self.model = kwargs['model'].to(self.args.device)
+        self.mlp = kwargs['mlp'].to(self.args.device)
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
         self.writer = SummaryWriter(log_dir='runs/'+logdir)
@@ -30,6 +31,7 @@ class SimCLR(object):
             self.mse = torch.nn.MSELoss().to(self.args.device)
             self.wasserstein = WassersteinLoss().to(self.args.device)
             self.model_to_steal = model_to_steal.to(self.args.device)
+            self.victim_mlp = victim_mlp.to(self.args.device)
 
     def info_nce_loss(self, features):
 
@@ -62,7 +64,7 @@ class SimCLR(object):
         logits = logits / self.args.temperature
         return logits, labels
 
-    def train(self, train_loader):
+    def train(self, train_loader, watermark_loader):
 
         scaler = GradScaler(enabled=self.args.fp16_precision)
 
@@ -100,6 +102,26 @@ class SimCLR(object):
 
                 n_iter += 1
 
+            for images, _ in tqdm(watermark_loader):
+                import ipdb; ipdb.set_trace()
+                images = torch.cat(images, dim=0)
+
+                images = images.to(self.args.device)
+
+                with autocast(enabled=self.args.fp16_precision):
+                    features = self.model(images)
+                    logits = self.mlp(features)
+                    labels = torch.cat([torch.tensor([0, 1]) for _ in range(args.batch_size)], dim=0).to(self.args.device)
+                    # labels = torch.cat([torch.zeros(args.batch_size), torch.ones(args.batch_size)], dim=0).to(self.args.device)
+                    loss = self.criterion(logits, labels)
+
+                self.optimizer.zero_grad()
+
+                scaler.scale(loss).backward()
+
+                scaler.step(self.optimizer)
+                scaler.update()
+
             # warmup for the first 10 epochs
             if epoch_counter >= 10:
                 self.scheduler.step()
@@ -112,12 +134,23 @@ class SimCLR(object):
             'epoch': self.args.epochs,
             'arch': self.args.arch,
             'state_dict': self.model.state_dict(),
+            'mlp_state_dict': self.mlp.state_dict(),
             'optimizer': self.optimizer.state_dict(),
         }, is_best=False, filename=os.path.join(self.writer.log_dir, checkpoint_name))
         logging.info(f"Model checkpoint and metadata has been saved at {self.writer.log_dir}.")
+
+        watermark_accuracy = 0
+        for counter, (x_batch, _) in enumerate(watermark_loader):
+            x_batch = x_batch.to(device)
+            logits = mlp(model(x_batch))
+            y_batch = torch.cat([torch.tensor([0, 1]) for _ in range(args.batch_size)], dim=0).to(device)
+            top1 = accuracy(logits, y_batch, topk=(1,))
+            watermark_accuracy += top1[0]
+        watermark_accuracy /= (counter+1)
+        logging.info(f"Watermark accuracy is {watermark_accuracy}.")
         
         
-    def steal(self, train_loader, num_queries):
+    def steal(self, train_loader, watermark_loader, num_queries):
 
         scaler = GradScaler(enabled=self.args.fp16_precision)
 
@@ -179,3 +212,15 @@ class SimCLR(object):
             'optimizer': self.optimizer.state_dict(),
         }, is_best=False, filename=os.path.join(self.writer.log_dir, checkpoint_name))
         logging.info(f"Stolen model checkpoint and metadata has been saved at {self.writer.log_dir}.")
+
+        watermark_accuracy = 0
+        for counter, (x_batch, _) in enumerate(watermark_loader):
+            x_batch = x_batch.to(device)
+            logits = victim_mlp(model(x_batch))
+            y_batch = torch.cat([torch.tensor([0, 1]) for _ in range(args.batch_size)], dim=0).to(device)
+            top1 = accuracy(logits, y_batch, topk=(1,))
+            watermark_accuracy += top1[0]
+        watermark_accuracy /= (counter+1)
+        logging.info(f"Watermark accuracy is {watermark_accuracy}.")
+
+
