@@ -17,7 +17,7 @@ class ContrastiveLearningViewGenerator(object):
 
 class WatermarkViewGenerator(object):
 
-    def __init__(self, base_transform):
+    def __init__(self, base_transform, n_views):
         self.base_transform = base_transform
         self.n_views = n_views
 

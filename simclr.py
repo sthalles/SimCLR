@@ -16,7 +16,7 @@ torch.manual_seed(0)
 
 class SimCLR(object):
 
-    def __init__(self, stealing=False, model_to_steal=None, victim_mlp=None, logdir='', *args, **kwargs):
+    def __init__(self, stealing=False, model_to_steal=None, victim_mlp=None, logdir='simclr_cifar10/', *args, **kwargs):
         self.args = kwargs['args']
         self.model = kwargs['model'].to(self.args.device)
         self.mlp = kwargs['mlp'].to(self.args.device)
@@ -102,8 +102,8 @@ class SimCLR(object):
 
                 n_iter += 1
 
+            watermark_accuracy = 0
             for images, _ in tqdm(watermark_loader):
-                import ipdb; ipdb.set_trace()
                 images = torch.cat(images, dim=0)
 
                 images = images.to(self.args.device)
@@ -111,9 +111,11 @@ class SimCLR(object):
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(images)
                     logits = self.mlp(features)
-                    labels = torch.cat([torch.tensor([0, 1]) for _ in range(args.batch_size)], dim=0).to(self.args.device)
-                    # labels = torch.cat([torch.zeros(args.batch_size), torch.ones(args.batch_size)], dim=0).to(self.args.device)
+                    # labels = torch.cat([torch.tensor([0, 1]) for _ in range(args.batch_size)], dim=0).to(self.args.device)
+                    labels = torch.cat([torch.zeros(self.args.batch_size), torch.ones(self.args.batch_size)], dim=0).long().to(self.args.device)
                     loss = self.criterion(logits, labels)
+                    w_top1 = accuracy(logits, labels, topk=(1,))
+                    watermark_accuracy += w_top1[0]
 
                 self.optimizer.zero_grad()
 
@@ -125,7 +127,7 @@ class SimCLR(object):
             # warmup for the first 10 epochs
             if epoch_counter >= 10:
                 self.scheduler.step()
-            logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}\tTop1 accuracy: {top1[0]}")
+            logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}\tTop1 accuracy: {top1[0]}\tWatermark accuracy: {w_top1[0]}")
 
         logging.info("Training has finished.")
         # save model checkpoints
@@ -143,7 +145,8 @@ class SimCLR(object):
         for counter, (x_batch, _) in enumerate(watermark_loader):
             x_batch = x_batch.to(device)
             logits = mlp(model(x_batch))
-            y_batch = torch.cat([torch.tensor([0, 1]) for _ in range(args.batch_size)], dim=0).to(device)
+            y_batch = torch.cat([torch.zeros(self.args.batch_size), torch.ones(self.args.batch_size)], dim=0).long().to(self.args.device)
+            # y_batch = torch.cat([torch.tensor([0, 1]) for _ in range(self.args.batch_size)], dim=0).to(device)
             top1 = accuracy(logits, y_batch, topk=(1,))
             watermark_accuracy += top1[0]
         watermark_accuracy /= (counter+1)
@@ -174,8 +177,8 @@ class SimCLR(object):
                     features = self.model(images)
                     all_features = torch.cat([features, query_features], dim=0)
                     logits, labels = self.info_nce_loss(all_features)
-                    loss = soft_nn_loss(self.args, all_features, pairwise_euclid_distance, 100)
-                    # loss = self.mse(features, query_features)
+                    # loss = soft_nn_loss(self.args, all_features, pairwise_euclid_distance, 100)
+                    loss = self.mse(features, query_features)
                     # loss = self.criterion(logits, labels)
 
                 self.optimizer.zero_grad()
@@ -217,7 +220,7 @@ class SimCLR(object):
         for counter, (x_batch, _) in enumerate(watermark_loader):
             x_batch = x_batch.to(device)
             logits = victim_mlp(model(x_batch))
-            y_batch = torch.cat([torch.tensor([0, 1]) for _ in range(args.batch_size)], dim=0).to(device)
+            y_batch = torch.cat([torch.zeros(self.args.batch_size), torch.ones(self.args.batch_size)], dim=0).long().to(self.args.device)
             top1 = accuracy(logits, y_batch, topk=(1,))
             watermark_accuracy += top1[0]
         watermark_accuracy /= (counter+1)
