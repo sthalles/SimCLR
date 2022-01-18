@@ -19,7 +19,8 @@ class SimCLR(object):
     def __init__(self, stealing=False, model_to_steal=None, victim_mlp=None, logdir='simclr_cifar10/', *args, **kwargs):
         self.args = kwargs['args']
         self.model = kwargs['model'].to(self.args.device)
-        self.mlp = kwargs['mlp'].to(self.args.device)
+        if not stealing:
+            self.mlp = kwargs['mlp'].to(self.args.device)
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
         self.writer = SummaryWriter(log_dir='runs/'+logdir)
@@ -143,6 +144,7 @@ class SimCLR(object):
 
         watermark_accuracy = 0
         for counter, (x_batch, _) in enumerate(watermark_loader):
+            x_batch = torch.cat(x_batch, dim=0)
             x_batch = x_batch.to(device)
             logits = mlp(model(x_batch))
             y_batch = torch.cat([torch.zeros(self.args.batch_size), torch.ones(self.args.batch_size)], dim=0).long().to(self.args.device)
@@ -218,8 +220,9 @@ class SimCLR(object):
 
         watermark_accuracy = 0
         for counter, (x_batch, _) in enumerate(watermark_loader):
-            x_batch = x_batch.to(device)
-            logits = victim_mlp(model(x_batch))
+            x_batch = torch.cat(x_batch, dim=0)
+            x_batch = x_batch.to(self.args.device)
+            logits = self.victim_mlp(self.model(x_batch))
             y_batch = torch.cat([torch.zeros(self.args.batch_size), torch.ones(self.args.batch_size)], dim=0).long().to(self.args.device)
             top1 = accuracy(logits, y_batch, topk=(1,))
             watermark_accuracy += top1[0]

@@ -31,10 +31,9 @@ def load_model_to_steal(folder_name, model, mlp, device):
     file_id = get_file_id_by_model(folder_name)
     print("Loading stolen model: ", folder_name)
     
-    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/stolen_checkpoint_0100.pth.tar'.format(folder_name), map_location=device)
+    checkpoint = torch.load('/ssd003/home/nikita/SimCLR/runs/{}/stolen_checkpoint_0200.pth.tar'.format(folder_name), map_location=device)
     state_dict = checkpoint['state_dict']
-    mlp_state_dict = checkpoint['mlp_state_dict']
-
+    
     for k in list(state_dict.keys()):
         if k.startswith('backbone.'):
             if k.startswith('backbone') and not k.startswith('backbone.fc'):
@@ -43,7 +42,6 @@ def load_model_to_steal(folder_name, model, mlp, device):
         del state_dict[k]
         
     log = model.load_state_dict(state_dict, strict=False)
-    mlp_model.load_state_dict(mlp_state_dict)
     assert log.missing_keys == ['fc.weight', 'fc.bias']
     return model, mlp
 
@@ -84,7 +82,7 @@ elif args.arch == 'resnet50':
     model = torchvision.models.resnet50(pretrained=False, num_classes=10).to(device)
 
 mlp = MLP(128, 2)
-model, mlp = load_model_to_steal(args.folder_name, model, device=device)
+model, mlp = load_model_to_steal(args.folder_name, model, mlp, device=device)
 
 if args.dataset_name == 'cifar10':
     train_loader, test_loader = get_cifar10_data_loaders(download=True)

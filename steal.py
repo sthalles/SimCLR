@@ -2,7 +2,7 @@ import argparse
 import torch
 import torch.backends.cudnn as cudnn
 from torchvision import models
-from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, RegularDatase, WatermarkDataset
+from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, RegularDataset, WatermarkDataset
 from models.resnet_simclr import ResNetSimCLR, MLP
 from simclr import SimCLR
 from utils import load_model_to_steal
