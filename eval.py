@@ -19,7 +19,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy
 from torch.distributions import Categorical
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, adjusted_rand_score, normalized_mutual_info_score
+from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, CIFAROnlyKClasses
+import collections
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
                      and callable(models.__dict__[name]))
@@ -28,7 +30,7 @@ parser = argparse.ArgumentParser(description='PyTorch SimCLR')
 parser.add_argument('-data', metavar='DIR', default='./datasets',
                     help='path to dataset')
 parser.add_argument('-dataset-name', default='stl10',
-                    help='dataset name', choices=['stl10', 'cifar10', 'mnist'])
+                    help='dataset name', choices=['stl10', 'cifar10', 'mnist', 'svhn', 'fmnist'])
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -64,9 +66,12 @@ parser.add_argument('--temperature', default=0.07, type=float,
 parser.add_argument('--n-views', default=2, type=int, metavar='N',
                     help='Number of views for contrastive learning training.')
 parser.add_argument('--gpu-index', default=0, type=int, help='Gpu index.')
-parser.add_argument('--level_number', default=15, type=int, help='Number of nodes of the binary tree')
+parser.add_argument('--level_number', default=3, type=int, help='Number of nodes of the binary tree')
 parser.add_argument('--save_point', default=".", type=str, help="Path to .pth ")
-
+parser.add_argument("--gumbel", default=False, action="store_true",help="If gumbel sigmoid is used")
+parser.add_argument("--temp", default=1.0,type=float,help='temp for gumbel softmax/sigmoid')
+parser.add_argument("--loss_at_all_level", default=False, action="store_true",
+                    help="Flag to do something")
 
 def arctang(p): 
     return torch.log(p/((1-p)+ 1e-8))
@@ -86,30 +91,57 @@ def eval_classification():
    
     # Load .pth
     model_file = glob.glob(args.save_point + "/*.pth.tar")
+    print(model_file[0])
     checkpoint = torch.load(model_file[0])
     
-
     model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim, args=args)
     model.load_state_dict(checkpoint['state_dict'])
     model = model.to(args.device)
-    simclr = SimCLR(model=model, optimizer=None, scheduler=None, args=args)
-    clasiffier_model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(14,10)).to(args.device)
+    clasiffier_model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(512,100), torch.nn.ReLU(), torch.nn.Linear(100, 10)).to(args.device)
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(clasiffier_model.parameters())
+    # list(res.children())[:-2
+    # print(list(model.backbone.children())[0:-2])
+    res = list(model.backbone.children())[0:-2]
+    model = torch.nn.Sequential(*res)
+    print(model)
     
-
+    if args.dataset_name == 'cifar10kclasses':
+        validset = CIFAROnlyKClasses('./',transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),classes=(1,3,8))
     if args.dataset_name == 'cifar10':
-        validset = datasets.CIFAR10('./', train=False, transform=transforms.ToTensor(), download=True)
-        trainset = datasets.CIFAR10('./', train=True, transform=transforms.ToTensor(), download=True)
+        validset = datasets.CIFAR10('./', train=False, 
+            transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        ), download=True)
+        trainset = datasets.CIFAR10('./', train=True, 
+            transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        ), download=True)        
         mnist_ex = torch.empty((3, 32, 32)) 
         classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-    if args.dataset_name == 'mnist':
+    elif args.dataset_name == 'mnist':
         validset = datasets.MNIST('./', train=False, transform=transforms.ToTensor(), download=True)
         trainset = datasets.MNIST('./', train=True, transform=transforms.ToTensor(), download=True)
-        mnist_ex = torch.empty((28, 28))  
-        classes = ('0', '1', '2', '3',
-           '4', '5', '6', '7', '8', '9')    
+        mnist_ex = torch.empty((28, 28)) 
+    elif args.dataset_name == 'svhn': 
+        validset = datasets.SVHN('./', split='test', 
+            transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.4376821, 0.4437697, 0.47280442), (0.19803012, 0.20101562, 0.19703614))]
+        ), download=True)
+        trainset = datasets.SVHN('./', split='train', 
+            transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.4376821, 0.4437697, 0.47280442), (0.19803012, 0.20101562, 0.19703614))]
+        ), download=True)        
+        mnist_ex = torch.empty((3, 32, 32)) 
+        classes = ('plane', 'car', 'bird', 'cat',
+           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')  
     # Create valid_datasets
     valid_loader = torch.utils.data.DataLoader(validset, batch_size=128, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
@@ -117,7 +149,7 @@ def eval_classification():
     model.eval()
     for param in model.parameters():
         param.requires_grad = False
-    for epoch in range(5):  # loop over the dataset multiple times
+    for epoch in range(50):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
@@ -131,14 +163,16 @@ def eval_classification():
 
             # forward + backward + optimize
             feature = model(inputs)
-            outputs_array = []
-            for level in range(1, args.level_number):
-                prob_features = simclr.probability_vec_with_level(feature, level)
-                prob_features = prob_features + 1e-8
-                outputs_array.append(prob_features)
-            prob_features = torch.cat((outputs_array),1)
-            prob_features = arctang(prob_features)
-            inputs = prob_features
+            # print(feature.shape)
+            # outputs_array = []
+            # for level in range(1, args.level_number):
+            #     prob_features = simclr.probability_vec_with_level(feature, level)
+            #     prob_features = prob_features + 1e-8
+            #     outputs_array.append(prob_features)
+            # prob_features = torch.cat((outputs_array),1)
+            # prob_features = arctang(prob_features)
+            inputs = feature
+            # inputs = prob_features
             outputs = clasiffier_model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
@@ -164,13 +198,14 @@ def eval_classification():
             outputs_array = []
             # calculate outputs by running images through the network
             feature = model(images)
-            for level in range(1, args.level_number):
-                prob_features = simclr.probability_vec_with_level(feature, level)
-                prob_features = prob_features + 1e-8
-                outputs_array.append(prob_features)
-            prob_features = torch.cat((outputs_array),1)
-            prob_features = arctang(prob_features)
-            images = prob_features
+            # for level in range(1, args.level_number):
+            #     prob_features = simclr.probability_vec_with_level(feature, level)
+            #     prob_features = prob_features + 1e-8
+            #     outputs_array.append(prob_features)
+            # prob_features = torch.cat((outputs_array),1)
+            # prob_features = arctang(prob_features)
+            images = feature
+            # images = prob_features
             outputs = clasiffier_model(images)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -180,7 +215,7 @@ def eval_classification():
                     correct_pred[classes[label]] += 1
                 total_pred[classes[label]] += 1
 
-    print('Accuracy of the network on the 10000 test images: %d %%' % (
+    print('Accuracy of the network on the 10000 test images: %f %%' % (
         100 * correct / total))
     for classname, correct_count in correct_pred.items():
         accuracy = 100 * float(correct_count) / total_pred[classname]
@@ -207,12 +242,15 @@ def eval():
         args.device = torch.device('cpu')
         args.gpu_index = -1
    
-    writer = SummaryWriter(log_dir=f"./eval/{datetime.now().strftime('%b%d_%H-%M-%S') + '' + socket.gethostname()}")
+    writer = SummaryWriter(log_dir=f"./eval/{args.save_point.split('/')[-1]}")
+
     # Load .pth
     model_file = glob.glob(args.save_point + "/*.pth.tar")
+    print(model_file[0])
     checkpoint = torch.load(model_file[0])
     
     model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim, args=args)
+    print(model)
     model.load_state_dict(checkpoint['state_dict'])
     model = model.to(args.device)
     simclr = SimCLR(model=model, optimizer=None, scheduler=None, args=args)
@@ -223,15 +261,45 @@ def eval():
     # trainset = datasets.MNIST('./', train=True, transform=transforms.ToTensor(), download=True)
     ex = torch.empty(2**args.level_number)
     if args.dataset_name == 'cifar10':
-        validset = datasets.CIFAR10('./', train=False, transform=transforms.ToTensor(), download=True)
-        trainset = datasets.CIFAR10('./', train=True, transform=transforms.ToTensor(), download=True)
+        validset = datasets.CIFAR10('./', train=False, 
+            transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        ), download=True)
+        trainset = datasets.CIFAR10('./', train=True, 
+            transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        ), download=True)        
         mnist_ex = torch.empty((3, 32, 32)) 
-    if args.dataset_name == 'mnist':
+        classes = ('plane', 'car', 'bird', 'cat',
+           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    elif args.dataset_name == 'mnist':
         validset = datasets.MNIST('./', train=False, transform=transforms.ToTensor(), download=True)
         trainset = datasets.MNIST('./', train=True, transform=transforms.ToTensor(), download=True)
-        mnist_ex = torch.empty((28, 28))    
+        mnist_ex = torch.empty((28, 28)) 
+        classes = ('0', '1', '2', '3',
+           '4', '5', '6', '7', '8', '9') 
+    elif args.dataset_name == 'fmnist':
+        validset = datasets.FashionMNIST('./', train=False, transform=transforms.ToTensor(), download=True)
+        trainset = datasets.FashionMNIST('./', train=True, transform=transforms.ToTensor(), download=True)
+        mnist_ex = torch.empty((28, 28)) 
+        classes = ('T-shirt', 'Trouser/pants', 'Pullover shirt','Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker','Bag', 'Ankle boot',)
+    elif args.dataset_name == 'svhn': 
+        validset = datasets.SVHN('./', split='test', 
+            transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.4376821, 0.4437697, 0.47280442), (0.19803012, 0.20101562, 0.19703614))]
+        ), download=True)
+        trainset = datasets.SVHN('./', split='train', 
+            transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.4376821, 0.4437697, 0.47280442), (0.19803012, 0.20101562, 0.19703614))]
+        ), download=True)        
+        mnist_ex = torch.empty((3, 32, 32)) 
+        classes = ('1', '2', '3',
+           '4', '5', '6', '7', '8', '9', '0')  
     valid_loader = torch.utils.data.DataLoader(validset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
-    ex = torch.empty(2**args.level_number)
     histograms_for_each_label_per_level = {level : numpy.array([numpy.zeros_like(torch.empty(2**level)) for i in range(0, 10)])  for level in range(1, args.level_number+1)}
     image_for_each_cluster_per_level = {level : numpy.array([numpy.zeros_like(mnist_ex) for i in range(0,2**args.level_number)])  for level in range(1, args.level_number+1)}
     images_with_highest_entropy_per_level = {level :{ i: [0,numpy.zeros_like(mnist_ex)] for i in range(10)}  for level in range(1, args.level_number+1)}
@@ -239,25 +307,31 @@ def eval():
     # image_for_each_cluster = numpy.array([numpy.zeros_like(mnist_ex) for i in range(0,2**args.level_number)])
     # images_with_highest_entropy = {i: [0,numpy.zeros_like(mnist_ex)] for i in range(10)}
     model.eval()
-    
+    labels = []
+    predictions = []
     for i, (image, label) in enumerate(tqdm(valid_loader)):
+        if i == 20000:
+            break   
         image, label = image.cuda(), label.cuda()
         feature = model(image)
+        labels.append(label.detach().cpu().item())
         for level in range(1, args.level_number+1):
             prob_features = simclr.probability_vec_with_level(feature, level)
             entropy = Categorical(probs = prob_features).entropy()
             for key in images_with_highest_entropy_per_level[level].keys():
                 if entropy > images_with_highest_entropy_per_level[level][key][0]:
-                    images_with_highest_entropy_per_level[level][key][1] = image.squeeze(0).squeeze(0).cpu().detach().numpy()
+                    images_with_highest_entropy_per_level[level][key][1] = image
                     images_with_highest_entropy_per_level[level][key][0] = entropy
                     break
             histograms_for_each_label_per_level[level][label.item()][torch.argmax(prob_features).item()] += 1
-            image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] += image.squeeze(0).squeeze(0).cpu().detach().numpy()
-            image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] = image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] / 2
+            image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] += image.squeeze().cpu().detach().numpy()
+            # image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] = image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] / 2
+            if level == args.level_number:
+                predictions.append(torch.argmax(prob_features.detach().cpu()).unsqueeze(dim=0).item())
     for level in range(1, args.level_number+1):
-        df_cm = pd.DataFrame(histograms_for_each_label_per_level[level], index = [i for i in range(0,10)],
+        df_cm = pd.DataFrame(histograms_for_each_label_per_level[level], index = [class1 for class1 in classes],
                     columns = [i for i in range(0,2**level)])
-        plt.figure(figsize = (10,7))
+        plt.figure(figsize = (15,10))
         plt.title(f'Confusion matrix at level {level}')
         plt.xlabel('Cluster')
         plt.ylabel('Label')
@@ -271,8 +345,12 @@ def eval():
         for u in range(0,2**level):
             plt.figure(figsize = (10,7))
             plt.title(f'Mean of the images at level {level} that ended up in cluster number {u}')
-            plt.imshow(((image_for_each_cluster_per_level[level][u])).reshape(32,32,3))
-            # plt.imshow(image_for_each_cluster_per_level[level][u], cmap='gray')
+            sum_per_label = sum([histograms_for_each_label_per_level[level][k][u] for k in range(0,10)])
+            img = image_for_each_cluster_per_level[level][u] / sum_per_label
+            if args.dataset_name == 'cifar10':
+                plt.imshow(numpy.transpose(img, (1, 2, 0)))
+            else:
+                plt.imshow(img, cmap='gray')
             buf = io.BytesIO()
             plt.savefig(buf, format='png')
             buf.seek(0)
@@ -282,15 +360,34 @@ def eval():
         for u in range(0,10):
             plt.figure(figsize = (10,7))
             plt.title(f'Example visualization of images with highest entropy - value of entropy at level {level} img number {u}:{images_with_highest_entropy_per_level[level][u][0].item()}')
-            plt.imshow(((images_with_highest_entropy_per_level[level][u][1])).reshape(32,32,3))
-            # plt.imshow(images_with_highest_entropy_per_level[level][u][1], cmap='gray')
+            img = images_with_highest_entropy_per_level[level][u][1]
+            npimg = img.cpu().detach().numpy().squeeze()
+            if args.dataset_name == 'cifar10':
+                plt.imshow(numpy.transpose(npimg, (1, 2, 0)))
+            else:
+                plt.imshow(npimg, cmap='gray')
             buf = io.BytesIO()
             plt.savefig(buf, format='png')
             buf.seek(0)
             image = PIL.Image.open(buf)
             image = transforms.ToTensor()(image)          
             writer.add_image(f'Example visualization of images with highest entropy - value of entropy at level {level} img number {u}:{images_with_highest_entropy_per_level[level][u][0].item()}', image)
+    plt.figure(figsize = (10,7))
+    plt.hist(labels, bins=range(0,16), alpha=0.5, label="labels")
+    plt.hist(predictions, bins=range(0,16), alpha=0.5, label="cluster prediction")
+    plt.xlabel("Data", size=14)
+    plt.ylabel("Count", size=14)
+    plt.legend(loc='upper right')
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    image = PIL.Image.open(buf)
+    image = transforms.ToTensor()(image)          
+    writer.add_image(f'Comparing histogram for cluster vs histogram for labels', image)
+    writer.add_scalar('adjusted_rand_score_value', adjusted_rand_score(labels, predictions))
+    writer.add_scalar('normalized_mutual_info_score_value', normalized_mutual_info_score(labels, predictions))
+    writer.close()
 
 if __name__ == "__main__":
     # eval_classification()
-    eval()
+    eval()  

@@ -5,6 +5,7 @@ from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
 from models.resnet_simclr import ResNetSimCLR
 from simclr import SimCLR
+import glob
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -14,7 +15,7 @@ parser = argparse.ArgumentParser(description='PyTorch SimCLR')
 parser.add_argument('-data', metavar='DIR', default='./datasets',
                     help='path to dataset')
 parser.add_argument('-dataset-name', default='stl10',
-                    help='dataset name', choices=['stl10', 'cifar10', 'mnist'])
+                    help='dataset name', choices=['stl10', 'cifar10', 'mnist', 'svhn' , 'fmnist', 'cifar10kclasses'])
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -53,6 +54,10 @@ parser.add_argument('--gpu-index', default=0, type=int, help='Gpu index.')
 parser.add_argument('--level_number', default=3, type=int, help='Number of nodes of the binary tree')
 parser.add_argument("--loss_at_all_level", default=False, action="store_true",
                     help="Flag to do something")
+parser.add_argument("--gumbel", default=False, action="store_true",help="If gumbel sigmoid is used")
+parser.add_argument("--temp", default=1.0,type=float,help='temp for gumbel softmax/sigmoid')
+parser.add_argument('--save_point', default=".", type=str, help="Path to .pth ")
+parser.add_argument('--load_model', default=False, action="store_true",help="Use pretrained model")
 
 def main():
     args = parser.parse_args()
@@ -75,7 +80,14 @@ def main():
         num_workers=args.workers, pin_memory=True, drop_last=True)
 
     model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim, args=args)
+    if args.load_model:
+        model_file = glob.glob(args.save_point + "/*.pth.tar")
+        print(f'Using Pretrained model {model_file[0]}')
+        checkpoint = torch.load(model_file[0])
+        model.load_state_dict(checkpoint['state_dict'])
 
+
+    print(model)
     optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader), eta_min=0,

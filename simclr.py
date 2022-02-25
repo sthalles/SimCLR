@@ -18,7 +18,7 @@ class SimCLR(object):
         self.model = kwargs['model'].to(self.args.device)
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
-        self.writer = SummaryWriter()
+        self.writer = SummaryWriter(log_dir=f"./runs/{self.args.dataset_name}_TreeLevel{self.args.level_number}_lossAtAll{self.args.loss_at_all_level}_gumbel{self.args.gumbel}_temp{self.args.temp}")
         logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
 
@@ -105,9 +105,15 @@ class SimCLR(object):
         if self.args.loss_at_all_level:
             for level in (1, self.args.level_number):
                 prob_features = self.probability_vec_with_level(features, level)
+                # loss_value += torch.nn.KLDivLoss(reduction='mean')(torch.log((prob_features[torch.where(labels > 0)[0]]+  1e-8)), (prob_features[torch.where(labels > 0)[1]] + 1e-8))
+                # loss_value -= torch.sum((torch.bmm(torch.sqrt(prob_features[torch.where(labels > 0)[0]].unsqueeze(1) +  1e-8), torch.sqrt(prob_features[torch.where(labels > 0)[1]].unsqueeze(2) + 1e-8)))) / prob_features[torch.where(labels > 0)[0]].shape[0]
                 loss_value -= torch.mean((torch.bmm(torch.sqrt(prob_features[torch.where(labels > 0)[0]].unsqueeze(1) +  1e-8), torch.sqrt(prob_features[torch.where(labels > 0)[1]].unsqueeze(2) + 1e-8))))
+
                 # Calculate loss on negative classes
+                # loss_value -=torch.nn.KLDivLoss(reduction='mean')(torch.log((prob_features[torch.where(labels == 0)[0]] + 1e-8)), (prob_features[torch.where(labels == 0)[1]] + 1e-8))
+                # loss_value += torch.sum((torch.bmm(torch.sqrt(prob_features[torch.where(labels == 0)[0]].unsqueeze(1) + 1e-8), torch.sqrt(prob_features[torch.where(labels == 0)[1]].unsqueeze(2) + 1e-8)))) / prob_features[torch.where(labels == 0)[0]].shape[0]
                 loss_value += torch.mean((torch.bmm(torch.sqrt(prob_features[torch.where(labels == 0)[0]].unsqueeze(1) + 1e-8), torch.sqrt(prob_features[torch.where(labels == 0)[1]].unsqueeze(2) + 1e-8))))
+
             return loss_value
         else:
             # return loss_value
@@ -133,20 +139,22 @@ class SimCLR(object):
         logging.info(f"Training with gpu: {self.args.disable_cuda}.")
 
         for epoch_counter in range(self.args.epochs):
-            for i, (images, _) in enumerate(tqdm(train_loader)):
+            for i, (images, label) in enumerate(tqdm(train_loader)):
+
                 images = torch.cat(images, dim=0)
 
                 images = images.to(self.args.device)
 
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(images)
-                    # logits, labels = self.info_nce_loss(features)
+                    features2 = self.model.backbone(images)
+                    logits2, labels2 = self.info_nce_loss(features2)
                     loss = self.binary_tree_loss(features)
-                    # loss = self.criterion(logits, labels)
-
+                    loss2 = self.criterion(logits2, labels2)
+                    loss_sum = loss + loss2
                 self.optimizer.zero_grad()
 
-                scaler.scale(loss).backward()
+                scaler.scale(loss_sum).backward()
 
                 scaler.step(self.optimizer)
                 scaler.update()
