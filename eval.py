@@ -72,7 +72,10 @@ parser.add_argument("--gumbel", default=False, action="store_true",help="If gumb
 parser.add_argument("--temp", default=1.0,type=float,help='temp for gumbel softmax/sigmoid')
 parser.add_argument("--loss_at_all_level", default=False, action="store_true",
                     help="Flag to do something")
-
+parser.add_argument('--regularization', default=False, action="store_true", help="Normalize to uniform")
+parser.add_argument('--regularization_at_all_level', default=False, action="store_true", help="If regularization on all levels")
+parser.add_argument('--per_level', default=False, action="store_true", help="Normalize to uniform")
+parser.add_argument('--per_node', default=False, action="store_true", help="Normalize to uniform")
 def arctang(p): 
     return torch.log(p/((1-p)+ 1e-8))
 
@@ -259,12 +262,15 @@ def eval():
     # Create valid_datasets
     # validset = datasets.MNIST('./', train=False, transform=transforms.ToTensor(), download=True)
     # trainset = datasets.MNIST('./', train=True, transform=transforms.ToTensor(), download=True)
+    # reverse_normalization_cifar10 =  transforms.Normalize((0, 0, 0), (1/0.5, 1/0.5, 1/0.5))
+
     ex = torch.empty(2**args.level_number)
     if args.dataset_name == 'cifar10':
         validset = datasets.CIFAR10('./', train=False, 
             transform=transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                ]
         ), download=True)
         trainset = datasets.CIFAR10('./', train=True, 
             transform=transforms.Compose([
@@ -289,7 +295,8 @@ def eval():
         validset = datasets.SVHN('./', split='test', 
             transform=transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize((0.4376821, 0.4437697, 0.47280442), (0.19803012, 0.20101562, 0.19703614))]
+                # transforms.Normalize((0.4376821, 0.4437697, 0.47280442), (0.19803012, 0.20101562, 0.19703614))
+                ]
         ), download=True)
         trainset = datasets.SVHN('./', split='train', 
             transform=transforms.Compose([
@@ -308,10 +315,10 @@ def eval():
     # images_with_highest_entropy = {i: [0,numpy.zeros_like(mnist_ex)] for i in range(10)}
     model.eval()
     labels = []
-    predictions = []
+    predictions = {level: [] for level in range(1, args.level_number + 1)}
     for i, (image, label) in enumerate(tqdm(valid_loader)):
-        if i == 20000:
-            break   
+        # if i == 200:
+        #     break   
         image, label = image.cuda(), label.cuda()
         feature = model(image)
         labels.append(label.detach().cpu().item())
@@ -320,14 +327,13 @@ def eval():
             entropy = Categorical(probs = prob_features).entropy()
             for key in images_with_highest_entropy_per_level[level].keys():
                 if entropy > images_with_highest_entropy_per_level[level][key][0]:
-                    images_with_highest_entropy_per_level[level][key][1] = image
+                    images_with_highest_entropy_per_level[level][key][1] = (image.squeeze().cpu().detach()).numpy()
                     images_with_highest_entropy_per_level[level][key][0] = entropy
                     break
             histograms_for_each_label_per_level[level][label.item()][torch.argmax(prob_features).item()] += 1
-            image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] += image.squeeze().cpu().detach().numpy()
+            image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] += (image.squeeze().cpu().detach()).numpy()
             # image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] = image_for_each_cluster_per_level[level][torch.argmax(prob_features).item()] / 2
-            if level == args.level_number:
-                predictions.append(torch.argmax(prob_features.detach().cpu()).unsqueeze(dim=0).item())
+            predictions[level].append(torch.argmax(prob_features.detach().cpu()).unsqueeze(dim=0).item())
     for level in range(1, args.level_number+1):
         df_cm = pd.DataFrame(histograms_for_each_label_per_level[level], index = [class1 for class1 in classes],
                     columns = [i for i in range(0,2**level)])
@@ -347,7 +353,7 @@ def eval():
             plt.title(f'Mean of the images at level {level} that ended up in cluster number {u}')
             sum_per_label = sum([histograms_for_each_label_per_level[level][k][u] for k in range(0,10)])
             img = image_for_each_cluster_per_level[level][u] / sum_per_label
-            if args.dataset_name == 'cifar10':
+            if args.dataset_name == 'cifar10' or args.dataset_name == 'svhn':
                 plt.imshow(numpy.transpose(img, (1, 2, 0)))
             else:
                 plt.imshow(img, cmap='gray')
@@ -361,11 +367,11 @@ def eval():
             plt.figure(figsize = (10,7))
             plt.title(f'Example visualization of images with highest entropy - value of entropy at level {level} img number {u}:{images_with_highest_entropy_per_level[level][u][0].item()}')
             img = images_with_highest_entropy_per_level[level][u][1]
-            npimg = img.cpu().detach().numpy().squeeze()
-            if args.dataset_name == 'cifar10':
-                plt.imshow(numpy.transpose(npimg, (1, 2, 0)))
+            # npimg = img.cpu().detach().numpy().squeeze()
+            if args.dataset_name == 'cifar10' or args.dataset_name == 'svhn':
+                plt.imshow(numpy.transpose(img, (1, 2, 0)))
             else:
-                plt.imshow(npimg, cmap='gray')
+                plt.imshow(img, cmap='gray')
             buf = io.BytesIO()
             plt.savefig(buf, format='png')
             buf.seek(0)
@@ -374,7 +380,9 @@ def eval():
             writer.add_image(f'Example visualization of images with highest entropy - value of entropy at level {level} img number {u}:{images_with_highest_entropy_per_level[level][u][0].item()}', image)
     plt.figure(figsize = (10,7))
     plt.hist(labels, bins=range(0,16), alpha=0.5, label="labels")
-    plt.hist(predictions, bins=range(0,16), alpha=0.5, label="cluster prediction")
+    plt.hist(predictions[args.level_number], bins=range(0,16), alpha=0.5, label="cluster prediction level 4")
+    plt.hist(predictions[args.level_number-1], bins=range(0,8), alpha=0.5, label="cluster prediction level 3")
+
     plt.xlabel("Data", size=14)
     plt.ylabel("Count", size=14)
     plt.legend(loc='upper right')
@@ -384,8 +392,9 @@ def eval():
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image)          
     writer.add_image(f'Comparing histogram for cluster vs histogram for labels', image)
-    writer.add_scalar('adjusted_rand_score_value', adjusted_rand_score(labels, predictions))
-    writer.add_scalar('normalized_mutual_info_score_value', normalized_mutual_info_score(labels, predictions))
+    for level in range(1, args.level_number+1): 
+        writer.add_scalar(f'adjusted_rand_score_at_{level}', adjusted_rand_score(labels, predictions[level]))
+    writer.add_scalar('normalized_mutual_info_score_value', normalized_mutual_info_score(labels, predictions[args.level_number]))
     writer.close()
 
 if __name__ == "__main__":

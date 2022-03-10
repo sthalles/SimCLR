@@ -1,6 +1,6 @@
 import numpy as np
 
-np.random.seed(0)
+# np.random.seed(0)
 
 
 class ContrastiveLearningViewGenerator(object):

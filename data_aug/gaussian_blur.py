@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torchvision.transforms import transforms
 
-np.random.seed(0)
+# np.random.seed(0)
 
 
 class GaussianBlur(object):

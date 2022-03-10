@@ -58,6 +58,12 @@ parser.add_argument("--gumbel", default=False, action="store_true",help="If gumb
 parser.add_argument("--temp", default=1.0,type=float,help='temp for gumbel softmax/sigmoid')
 parser.add_argument('--save_point', default=".", type=str, help="Path to .pth ")
 parser.add_argument('--load_model', default=False, action="store_true",help="Use pretrained model")
+parser.add_argument('--regularization', default=False, action="store_true", help="Normalize to uniform")
+parser.add_argument('--regularization_at_all_level', default=False, action="store_true", help="If regularization on all levels")
+parser.add_argument('--weight', default=1.0, type=float)
+parser.add_argument('--per_level', default=False, action="store_true", help="Normalize to uniform")
+parser.add_argument('--per_node', default=False, action="store_true", help="Normalize to uniform")
+
 
 def main():
     args = parser.parse_args()
