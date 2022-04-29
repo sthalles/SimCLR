@@ -63,6 +63,8 @@ parser.add_argument('--regularization_at_all_level', default=False, action="stor
 parser.add_argument('--weight', default=1.0, type=float)
 parser.add_argument('--per_level', default=False, action="store_true", help="Normalize to uniform")
 parser.add_argument('--per_node', default=False, action="store_true", help="Normalize to uniform")
+parser.add_argument('--start_pruning_epoch',  default=0, type=int, help='Epoch when pruning tree starts pruning')
+parser.add_argument('--nodes_to_prune', default=6, type=int, help='Amount of pruned nodes' )
 
 
 def main():
@@ -91,6 +93,9 @@ def main():
         print(f'Using Pretrained model {model_file[0]}')
         checkpoint = torch.load(model_file[0])
         model.load_state_dict(checkpoint['state_dict'])
+        if 'mask' in checkpoint:
+            model.masks_for_level = checkpoint['mask']
+
 
 
     print(model)

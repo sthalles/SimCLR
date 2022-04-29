@@ -21,7 +21,7 @@ class SimCLR(object):
         self.writer = SummaryWriter(log_dir=f"./runs/{self.args.dataset_name}_TreeLevel{self.args.level_number}_lossAtAll{self.args.loss_at_all_level}_reg{self.args.regularization}reg_att_all{self.args.regularization_at_all_level}_pernode{self.args.per_node}_perlevel{self.args.per_level}")
         logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
-
+        # for self.model
     def info_nce_loss(self, features):
 
         labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
@@ -94,7 +94,7 @@ class SimCLR(object):
         return prob_vec
             
             
-    def binary_tree_loss(self, features):
+    def binary_tree_loss(self, features, forward_mask):
         loss_value = torch.tensor([0], device=self.args.device, dtype=torch.float32)
         labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
@@ -110,9 +110,12 @@ class SimCLR(object):
         # discard the main diagonal from both: labels - there are not positive classes
         labels = labels * ~mask
         # Calculate probability vec based upon binary tree Approach
+        # Cross - (target, pred) = log(p) * target + log(1-p) * 1-target
         if self.args.loss_at_all_level:
             for level in range(1, self.args.level_number + 1):
                 prob_features = self.probability_vec_with_level(features, level)
+                prob_features = prob_features * forward_mask[level]
+
                 # print(prob_features.shape)
                 # loss_value += torch.nn.KLDivLoss(reduction='mean')(torch.log((prob_features[torch.where(labels > 0)[0]]+  1e-8)), (prob_features[torch.where(labels > 0)[1]] + 1e-8))
                 # loss_value -= torch.sum((torch.bmm(torch.sqrt(prob_features[torch.where(labels > 0)[0]].unsqueeze(1) +  1e-8), torch.sqrt(prob_features[torch.where(labels > 0)[1]].unsqueeze(2) + 1e-8)))) / prob_features[torch.where(labels > 0)[0]].shape[0]
@@ -126,7 +129,7 @@ class SimCLR(object):
         else:
             # return loss_value
             prob_features = self.probability_vec(features)
-            
+            prob_features = prob_features * forward_mask[self.args.level_number]
             # Calculate loss on positive classes
             # To avoid nan while calculating sqrt https://discuss.pytorch.org/t/runtimeerror-function-sqrtbackward-returned-nan-values-in-its-0th-output/48702  https://github.com/richzhang/PerceptualSimilarity/issues/69
             loss_value -= torch.mean((torch.bmm(torch.sqrt(prob_features[torch.where(labels > 0)[0]].unsqueeze(1) +  1e-8), torch.sqrt(prob_features[torch.where(labels > 0)[1]].unsqueeze(2) + 1e-8))))
@@ -143,6 +146,7 @@ class SimCLR(object):
         
 
     def train(self, train_loader):
+        print(self.model)
         torch.autograd.set_detect_anomaly(True)
         scaler = GradScaler(enabled=self.args.fp16_precision)
 
@@ -152,21 +156,24 @@ class SimCLR(object):
         n_iter = 0
         logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
         logging.info(f"Training with gpu: {self.args.disable_cuda}.")
-
+        self.masks_for_level = {level: torch.ones(2**level).cuda() for level in range(1, self.args.level_number+1)}
+        # tree_state = self.model.tree_model.state_dict().copy()
+        # Freez the tree model
         for epoch_counter in range(self.args.epochs):
+            mean_of_probs_per_level_per_epoch = {level: torch.zeros(2**level).cuda() for level in range(1, self.args.level_number+1)}
             for i, (images, label) in enumerate(tqdm(train_loader)):
 
                 images = torch.cat(images, dim=0)
 
                 images = images.to(self.args.device)
-                loss_ce = torch.tensor([0], device=self.args.device, dtype=torch.float32)
+                # loss_ce = torch.tensor([0], device=self.args.device, dtype=torch.float32)
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(images)
-                    features2 = self.model.backbone(images)
-                    logits2, labels2 = self.info_nce_loss(features2)
-                    loss = self.binary_tree_loss(features)
-                    loss2 = self.criterion(logits2, labels2)
-                    loss_sum = loss + loss2
+                    # features2 = self.model.backbone(images)
+                    # logits2, labels2 = self.info_nce_loss(features2)
+                    loss = self.binary_tree_loss(features, self.masks_for_level)
+                    # loss2 = self.criterion(logits2, labels2)
+                    loss_sum = loss
                 
                     # loss to have unifrom dist on leaves
                     if self.args.regularization:
@@ -175,20 +182,26 @@ class SimCLR(object):
                             for level in range(1, self.args.level_number+1):
                                 prob_features = self.probability_vec_with_level(features, level)
                                 probability_leaves = torch.mean(prob_features, dim=0)
+                                probability_leaves_masked = self.masks_for_level[level] * probability_leaves
+                                mean_of_probs_per_level_per_epoch[level] += probability_leaves_masked
+                                probability_leaves_masked = probability_leaves_masked + 1e-8
                                 if self.args.per_level:
-                                    loss_reg += (-torch.sum((1/(2**level)) * torch.log(probability_leaves)))
+                                    loss_reg += (-torch.sum((1/(2**level)) * torch.log(probability_leaves_masked)))
                                 if self.args.per_node:
                                     for leftnode in range(0,int((2**level)/2)):
-                                        loss_reg -=  (0.5 * torch.log(probability_leaves[2*leftnode]) + 0.5 * torch.log(probability_leaves[2*leftnode+1]))
+                                        loss_reg -=  (0.5 * torch.log(probability_leaves_masked[2*leftnode]) + 0.5 * torch.log(probability_leaves_masked[2*leftnode+1]))
                         else:
                             loss_reg = torch.tensor([0], device=self.args.device, dtype=torch.float32)
                             prob_features = self.probability_vec_with_level(features, self.args.level_number)
                             probability_leaves = torch.mean(prob_features, dim=0)
+                            probability_leaves_masked = self.masks_for_level[self.args.level_number] * probability_leaves
+                            mean_of_probs_per_level_per_epoch[self.args.level_number] += probability_leaves_masked
+                            probability_leaves_masked = probability_leaves_masked + 1e-8
                             if self.args.per_level:
-                                loss_reg += (-torch.sum((1/(2**self.args.level_number)) * torch.log(probability_leaves)))
+                                loss_reg += (-torch.sum((1/(2**self.args.level_number)) * torch.log(probability_leaves_masked)))
                             if self.args.per_node:
                                 for leftnode in range(0,int((2**self.args.level_number)/2)):
-                                        loss_reg -=  (0.5 * torch.log(probability_leaves[2*leftnode]) + 0.5 * torch.log(probability_leaves[2*leftnode+1]))
+                                        loss_reg -=  (0.5 * torch.log(probability_leaves_masked[2*leftnode]) + 0.5 * torch.log(probability_leaves_masked[2*leftnode+1]))
                         loss_sum += (1/(2**self.args.level_number)) * loss_reg
                 
                 self.optimizer.zero_grad()
@@ -199,29 +212,35 @@ class SimCLR(object):
                 if n_iter % self.args.log_every_n_steps == 0:
                     # top1, top5 = accuracy(logits, labels, topk=(1, 5))
                     self.writer.add_scalar('loss tree', loss, global_step=n_iter)
-                    self.writer.add_scalar('loss simclr', loss2, global_step=n_iter)
+                    # self.writer.add_scalar('loss simclr', loss2, global_step=n_iter)
                     if self.args.regularization:
                         self.writer.add_scalar('loss reg', loss_reg, global_step=n_iter)
                     # self.writer.add_scalar('acc/top1', top1[0], global_step=n_iter)
                     # self.writer.add_scalar('acc/top5', top5[0], global_step=n_iter)
-                    self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=n_iter)
-                    self.writer.add_histogram('histogram of the outputs', features, epoch_counter)
-                    
+                    # self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=n_iter)
+                    # self.writer.add_histogram('histogram of the outputs', features, epoch_counter)
                     
                 n_iter += 1
             # warmup for the first 10 epochs
+            if epoch_counter >= self.args.start_pruning_epoch and epoch_counter < self.args.start_pruning_epoch + 60*self.args.nodes_to_prune and epoch_counter % 60 == 0:
+                # For now only remove leaves from last level.
+                x = mean_of_probs_per_level_per_epoch[self.args.level_number]/i
+                x = x.double()
+                test = torch.where(x > 0.0, x, 1.0) 
+                self.masks_for_level[self.args.level_number][torch.argmin(test)] = 0
+                print(self.masks_for_level[self.args.level_number])
             if epoch_counter >= 10:
                 self.scheduler.step()
             logging.debug(f"Epoch: {epoch_counter}\tTree Loss: {loss}\t")
-            logging.debug(f"Epoch: {epoch_counter}\t SimCLR Loss {loss2}")
+            # logging.debug(f"Epoch: {epoch_counter}\t SimCLR Loss {loss2}")
             if self.args.regularization:
                 logging.debug(f"Epoch: {epoch_counter}\t Regularization Loss: {loss_reg}\t")
 
-            for n, p in self.model.named_parameters():
-                if 'bias' not in n:
-                    self.writer.add_histogram('{}'.format(n), p, epoch_counter)
-                    if p.requires_grad:
-                        self.writer.add_histogram('{}.grad'.format(n), p.grad, epoch_counter)
+            # for n, p in self.model.named_parameters():
+            #     if 'bias' not in n:
+            #         self.writer.add_histogram('{}'.format(n), p, epoch_counter)
+            #         if p.requires_grad:
+            #             self.writer.add_histogram('{}.grad'.format(n), p.grad, epoch_counter)
         logging.info("Training has finished.")
         # save model checkpoints
         checkpoint_name = 'checkpoint_{:04d}.pth.tar'.format(self.args.epochs)
@@ -230,6 +249,7 @@ class SimCLR(object):
             'arch': self.args.arch,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
+            'mask': self.masks_for_level
         }, is_best=False, filename=os.path.join(self.writer.log_dir, checkpoint_name))
         logging.info(f"Model checkpoint and metadata has been saved at {self.writer.log_dir}.")
         
