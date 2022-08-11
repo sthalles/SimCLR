@@ -169,11 +169,11 @@ class SimCLR(object):
                 # loss_ce = torch.tensor([0], device=self.args.device, dtype=torch.float32)
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(images)
-                    # features2 = self.model.backbone(images)
-                    # logits2, labels2 = self.info_nce_loss(features2)
+                    features2 = self.model.backbone(images)
+                    logits2, labels2 = self.info_nce_loss(features2)
                     loss = self.binary_tree_loss(features, self.masks_for_level)
-                    # loss2 = self.criterion(logits2, labels2)
-                    loss_sum = loss
+                    loss2 = self.criterion(logits2, labels2)
+                    loss_sum = loss + loss2
                 
                     # loss to have unifrom dist on leaves
                     if self.args.regularization:
@@ -189,7 +189,8 @@ class SimCLR(object):
                                     loss_reg += (-torch.sum((1/(2**level)) * torch.log(probability_leaves_masked)))
                                 if self.args.per_node:
                                     for leftnode in range(0,int((2**level)/2)):
-                                        loss_reg -=  (0.5 * torch.log(probability_leaves_masked[2*leftnode]) + 0.5 * torch.log(probability_leaves_masked[2*leftnode+1]))
+                                        if not (self.masks_for_level[level][2*leftnode] == 0 or self.masks_for_level[level][2*leftnode+1] == 0):
+                                            loss_reg -=  (0.5 * torch.log(probability_leaves_masked[2*leftnode]) + 0.5 * torch.log(probability_leaves_masked[2*leftnode+1]))
                         else:
                             loss_reg = torch.tensor([0], device=self.args.device, dtype=torch.float32)
                             prob_features = self.probability_vec_with_level(features, self.args.level_number)
@@ -201,6 +202,7 @@ class SimCLR(object):
                                 loss_reg += (-torch.sum((1/(2**self.args.level_number)) * torch.log(probability_leaves_masked)))
                             if self.args.per_node:
                                 for leftnode in range(0,int((2**self.args.level_number)/2)):
+                                    if not (self.masks_for_level[self.args.level_number][2*leftnode] == 0 or self.masks_for_level[self.args.level_number][2*leftnode+1] == 0):
                                         loss_reg -=  (0.5 * torch.log(probability_leaves_masked[2*leftnode]) + 0.5 * torch.log(probability_leaves_masked[2*leftnode+1]))
                         loss_sum += (1/(2**self.args.level_number)) * loss_reg
                 
@@ -222,17 +224,18 @@ class SimCLR(object):
                     
                 n_iter += 1
             # warmup for the first 10 epochs
-            if epoch_counter >= self.args.start_pruning_epoch and epoch_counter < self.args.start_pruning_epoch + 60*self.args.nodes_to_prune and epoch_counter % 60 == 0:
-                # For now only remove leaves from last level.
-                x = mean_of_probs_per_level_per_epoch[self.args.level_number]/i
-                x = x.double()
-                test = torch.where(x > 0.0, x, 1.0) 
-                self.masks_for_level[self.args.level_number][torch.argmin(test)] = 0
-                print(self.masks_for_level[self.args.level_number])
+            # if epoch_counter >= self.args.start_pruning_epoch and epoch_counter < self.args.start_pruning_epoch + 10*self.args.nodes_to_prune and epoch_counter % 10 == 0:
+            #     # For now only remove leaves from last level.
+            #     x = mean_of_probs_per_level_per_epoch[self.args.level_number]/i
+            #     print(x)
+            #     x = x.double()
+            #     test = torch.where(x > 0.0, x, 1.0) 
+            #     self.masks_for_level[self.args.level_number][torch.argmin(test)] = 0
+            #     print(self.masks_for_level[self.args.level_number])
             if epoch_counter >= 10:
                 self.scheduler.step()
             logging.debug(f"Epoch: {epoch_counter}\tTree Loss: {loss}\t")
-            # logging.debug(f"Epoch: {epoch_counter}\t SimCLR Loss {loss2}")
+            # logging.debug(f"Epoch: {epoch_counter}\t Si   mCLR Loss {loss2}")
             if self.args.regularization:
                 logging.debug(f"Epoch: {epoch_counter}\t Regularization Loss: {loss_reg}\t")
 
