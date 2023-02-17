@@ -32,7 +32,10 @@ class ContrastiveLearningDataset:
                                                           transform=ContrastiveLearningViewGenerator(
                                                               self.get_simclr_pipeline_transform(96),
                                                               n_views),
-                                                          download=True)}
+                                                          download=True),
+                            'facecrops': lambda: datasets.ImageFolder('/Users/johnzakkam/Research/SimCLR/data/facecrops', transform=ContrastiveLearningViewGenerator(
+                                                            self.get_simclr_pipeline_transform(32), n_views))
+                                                          }
 
         try:
             dataset_fn = valid_datasets[name]

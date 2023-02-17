@@ -20,6 +20,8 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     help='model architecture: ' +
                          ' | '.join(model_names) +
                          ' (default: resnet50)')
+parser.add_argument('-ckpt', default=None, type=str, metavar='CKPT', 
+                    help='the checkpoint to resume training')
 parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=200, type=int, metavar='N',
@@ -73,6 +75,7 @@ def main():
         num_workers=args.workers, pin_memory=True, drop_last=True)
 
     model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim)
+    ckpt = args.ckpt
 
     optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
 
@@ -81,7 +84,7 @@ def main():
 
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
     with torch.cuda.device(args.gpu_index):
-        simclr = SimCLR(model=model, optimizer=optimizer, scheduler=scheduler, args=args)
+        simclr = SimCLR(model=model, optimizer=optimizer, scheduler=scheduler, args=args, ckpt=ckpt)
         simclr.train(train_loader)
 
 
