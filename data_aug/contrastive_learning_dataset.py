@@ -32,7 +32,8 @@ class ContrastiveLearningDataset:
                                                           transform=ContrastiveLearningViewGenerator(
                                                               self.get_simclr_pipeline_transform(96),
                                                               n_views),
-                                                          download=True)}
+                                                          download=True)
+                                                          }
 
         try:
             dataset_fn = valid_datasets[name]

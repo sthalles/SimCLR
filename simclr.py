@@ -7,7 +7,8 @@ import torch.nn.functional as F
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from utils import save_config_file, accuracy, save_checkpoint
+from exceptions.exceptions import InvalidCheckpointPath
+from utils import save_config_file, accuracy, save_checkpoint, load_checkpoint
 
 torch.manual_seed(0)
 
@@ -60,12 +61,19 @@ class SimCLR(object):
 
         # save config file
         save_config_file(self.writer.log_dir, self.args)
+        n_iter, start_epochs, end_epochs = 0, 0, self.args.epochs
 
-        n_iter = 0
+        if(self.args.ckpt):
+            try:
+                self.model, start_epochs = load_checkpoint(self.model, self.args.ckpt)
+                end_epochs = end_epochs + start_epochs
+            except:
+                InvalidCheckpointPath()
+            
         logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
-        logging.info(f"Training with gpu: {self.args.disable_cuda}.")
+        logging.info(f"Training with gpu: {self.args.gpu_index}.")
 
-        for epoch_counter in range(self.args.epochs):
+        for epoch_counter in range(start_epochs, end_epochs):
             for images, _ in tqdm(train_loader):
                 images = torch.cat(images, dim=0)
 

@@ -5,6 +5,14 @@ import torch
 import yaml
 
 
+def load_checkpoint(model, filepath):
+    if(os.path.exists(filepath)):
+        ckpt = torch.load(filepath)
+        model.load_state_dict(ckpt['state_dict'])
+        epoch = ckpt['epoch']
+        return model, epoch    
+
+
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
