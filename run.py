@@ -47,14 +47,14 @@ parser.add_argument('--log-every-n-steps', default=100, type=int,
                     help='Log every n steps')
 parser.add_argument('--temperature', default=0.07, type=float,
                     help='softmax temperature (default: 0.07)')
-parser.add_argument('--n-views', default=2, type=int, metavar='N',
+parser.add_argument('--n-views', default=4, type=int, metavar='N',
                     help='Number of views for contrastive learning training.')
 parser.add_argument('--gpu-index', default=0, type=int, help='Gpu index.')
 
 
 def main():
     args = parser.parse_args()
-    assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
+    # assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
     # check if gpu training is available
     if not args.disable_cuda and torch.cuda.is_available():
         args.device = torch.device('cuda')

@@ -3,6 +3,7 @@ import os
 import sys
 
 import torch
+from torch import nn
 import torch.nn.functional as F
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
@@ -10,6 +11,48 @@ from tqdm import tqdm
 from utils import save_config_file, accuracy, save_checkpoint
 
 torch.manual_seed(0)
+
+
+class InfoNCELoss(nn.Module):
+
+    @staticmethod
+    def loss_forward(features: torch.Tensor, batch_size: int, n_views: int, temperature: float):
+        labels = torch.cat([torch.arange(batch_size) for _ in range(n_views)], dim=0).to(features.device)
+        # noinspection PyUnresolvedReferences
+        labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
+        features = F.normalize(features, dim=1)
+
+        similarity_matrix = torch.matmul(features, features.T)
+
+        # discard the main diagonal from both: labels and similarities matrix
+        mask = torch.eye(labels.shape[0], dtype=torch.bool).to(features.device)
+        labels = labels[~mask].view(labels.shape[0], -1)
+        similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
+        positives = similarity_matrix[labels.bool()].view(labels.shape[0] * (n_views - 1), -1)
+
+        # select only the negatives
+        # change: copy if n_views > 2 for other positive pairs of img
+        negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1).repeat(n_views - 1, 1)
+
+        logits = torch.cat([positives, negatives], dim=1)
+        # the idx-0 corresponding to similarity between same img from different views (positive pairs) while the
+        # other columns correspond to similarity between negative pairs.
+        # the objective is to get the feature representation such that the positive pairs have higher similarity
+        # (0-th column in logits) while the negative pairs (the rest of columns) have lower similairty.
+        # therefore the label is set to 0 and crossentropy loss is applied afterward between label and logits.
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).to(features.device)
+
+        logits = logits / temperature
+        return logits, labels
+
+    def __init__(self, batch_size, n_views, temperature):
+        super().__init__()
+        self.batch_size = batch_size
+        self.n_views = n_views
+        self.temperature = temperature
+
+    def forward(self, features):
+        return InfoNCELoss.loss_forward(features, self.batch_size, self.n_views, self.temperature)
 
 
 class SimCLR(object):
@@ -22,37 +65,7 @@ class SimCLR(object):
         self.writer = SummaryWriter()
         logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
-
-    def info_nce_loss(self, features):
-
-        labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
-        labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
-        labels = labels.to(self.args.device)
-
-        features = F.normalize(features, dim=1)
-
-        similarity_matrix = torch.matmul(features, features.T)
-        # assert similarity_matrix.shape == (
-        #     self.args.n_views * self.args.batch_size, self.args.n_views * self.args.batch_size)
-        # assert similarity_matrix.shape == labels.shape
-
-        # discard the main diagonal from both: labels and similarities matrix
-        mask = torch.eye(labels.shape[0], dtype=torch.bool).to(self.args.device)
-        labels = labels[~mask].view(labels.shape[0], -1)
-        similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
-        # assert similarity_matrix.shape == labels.shape
-
-        # select and combine multiple positives
-        positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
-
-        # select only the negatives the negatives
-        negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
-
-        logits = torch.cat([positives, negatives], dim=1)
-        labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.args.device)
-
-        logits = logits / self.args.temperature
-        return logits, labels
+        self.info_nce_loss = InfoNCELoss(self.args.batch_size, self.args.n_views, self.args.temperature)
 
     def train(self, train_loader):
 
