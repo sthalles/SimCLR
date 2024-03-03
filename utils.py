@@ -1,11 +1,10 @@
+import math
 import os
+import shutil
 import sys
-from torchvision import transforms
 import numpy as np
 import torch
 import torch.distributed as dist
-import simclr.loader
-from simclr.exceptions import InvalidAugmentationStrategy
 
 
 def fix_random_seeds(seed=31):
@@ -98,43 +97,6 @@ def init_distributed_mode(args):
     setup_for_distributed(args.rank == 0)
 
 
-def get_augmentations(args, strategy):
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-    )
-    if strategy == "pre-training":
-        return [
-            transforms.RandomResizedCrop(224, scale=(args.crop_min, 1.0)),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomApply([transforms.ColorJitter(0.8, 0.8, 0.8, 0.2)], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([simclr.loader.GaussianBlur([0.1, 2.0])], p=0.5),
-            transforms.ToTensor(),
-            normalize,
-        ]
-
-    elif strategy == "evaluation":
-        train_transforms = [
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ]
-        val_transforms = [
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ]
-
-        return train_transforms, val_transforms
-    else:
-        raise InvalidAugmentationStrategy(
-            "Please, choose one of pre-training or evaluation strategies."
-        )
-
-
-
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -169,9 +131,37 @@ class ProgressMeter(object):
     def display(self, batch):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
-        print("\t".join(entries))
+        return "\t".join(entries)
 
     def _get_batch_fmtstr(self, num_batches):
         num_digits = len(str(num_batches // 1))
         fmt = "{:" + str(num_digits) + "d}"
         return "[" + fmt + "/" + fmt.format(num_batches) + "]"
+
+
+def save_checkpoint(state, is_best, filename="checkpoint.pth.tar"):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, "model_best.pth.tar")
+
+
+def adjust_learning_rate(optimizer, epoch, args):
+    """Decays the learning rate with half-cycle cosine after warmup"""
+    if epoch < args.warmup_epochs:
+        lr = args.lr * epoch / args.warmup_epochs
+    else:
+        lr = (
+            args.lr
+            * 0.5
+            * (
+                1.0
+                + math.cos(
+                    math.pi
+                    * (epoch - args.warmup_epochs)
+                    / (args.epochs - args.warmup_epochs)
+                )
+            )
+        )
+    for param_group in optimizer.param_groups:
+        param_group["lr"] = lr
+    return lr

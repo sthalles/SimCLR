@@ -12,15 +12,14 @@ class SimCLR(nn.Module):
         T: softmax temperature (default: 1.0)
         """
         super(SimCLR, self).__init__()
-        
+
         self.T = T
         self.criterion = nn.CrossEntropyLoss()
-        
+
         # build encoder
         self.encoder = base_encoder(num_classes=mlp_dim)
 
         self._build_projector_and_predictor_mlps(dim, mlp_dim)
-
 
     def _build_mlp(self, num_layers, input_dim, mlp_dim, output_dim):
         mlp = []
@@ -40,24 +39,30 @@ class SimCLR(nn.Module):
         pass
 
     def nt_xent(self, features):
-        
+
         feat_a, feat_b = torch.chunk(features, 2)
-        
+
         batch_size, _ = feat_a.shape
-        
+
         feat_a_large = concat_all_gather(feat_a)
         feat_b_large = concat_all_gather(feat_b)
-        
+
         enlarged_batch_size = feat_a_large.shape[0]
 
-        masks = torch.eye(batch_size, enlarged_batch_size, dtype=torch.bool, device=feat_a.device) 
+        masks = torch.eye(
+            batch_size, enlarged_batch_size, dtype=torch.bool, device=feat_a.device
+        )
 
         logits_aa = torch.matmul(feat_a, feat_a_large.t()) / self.T
-        logits_aa.masked_fill_(masks, value=torch.finfo(torch.float16).min) # mask out main diagonal (dot product between the same view)
-        
+        logits_aa.masked_fill_(
+            masks, value=torch.finfo(torch.float16).min
+        )  # mask out main diagonal (dot product between the same view)
+
         logits_bb = torch.matmul(feat_b, feat_b_large.t()) / self.T
-        logits_bb.masked_fill_(masks, value=torch.finfo(torch.float16).min) # mask out main diagonal (dot product between the same view)
-        
+        logits_bb.masked_fill_(
+            masks, value=torch.finfo(torch.float16).min
+        )  # mask out main diagonal (dot product between the same view)
+
         logits_ab = torch.matmul(feat_a, feat_b_large.t()) / self.T
         logits_ba = torch.matmul(feat_b, feat_a_large.t()) / self.T
 
@@ -66,8 +71,7 @@ class SimCLR(nn.Module):
         loss_b = self.criterion(torch.cat([logits_ba, logits_bb], dim=-1), targets)
         loss = loss_a + loss_b
         return loss
- 
- 
+
     def forward(self, images):
         """
         Input:
@@ -78,7 +82,7 @@ class SimCLR(nn.Module):
         # compute features
         feats = self.encoder(images)
         feats = F.normalize(feats, dim=1)
-        
+
         return self.nt_xent(feats)
 
 
@@ -105,8 +109,9 @@ def concat_all_gather(tensor):
     Performs all_gather operation on the provided tensors.
     *** Warning ***: torch.distributed.all_gather has no gradient.
     """
-    tensors_gather = [torch.ones_like(tensor)
-        for _ in range(torch.distributed.get_world_size())]
+    tensors_gather = [
+        torch.ones_like(tensor) for _ in range(torch.distributed.get_world_size())
+    ]
     torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
 
     output = torch.cat(tensors_gather, dim=0)

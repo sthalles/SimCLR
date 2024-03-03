@@ -167,13 +167,28 @@ def main():
     # setup distributed training
     utils.init_distributed_mode(args)
     utils.fix_random_seeds(args.seed)
-    print(
-        "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
-    )
     cudnn.benchmark = True
 
-    fileConfig('simclr/logging/config.ini')
+    # setup logging library
+    fileConfig("simclr/logging/config.ini")
     logger = logging.getLogger()
+    logger.disabled = True
+
+    summary_writer = None
+    if utils.is_main_process():
+        # setup tensorboard
+        summary_writer = SummaryWriter()
+
+        FileOutputHandler = logging.FileHandler(
+            os.path.join(summary_writer.log_dir, f"train_gpu={args.gpu}.log")
+        )
+        # only the main process is allows to log
+        logger.disabled = False
+        logger.addHandler(FileOutputHandler)
+
+    logger.info(
+        "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
+    )
 
     # create model
     logger.info("Creating model '{}'".format(args.arch))
@@ -185,7 +200,6 @@ def main():
             args.softmax_t,
         )
     else:
-        print("Creating model!")
         model = simclr.builder.SimCLR_ResNet(
             partial(torchvision_models.__dict__[args.arch], zero_init_residual=True),
             args.feat_dim,
@@ -216,13 +230,11 @@ def main():
         )
 
     scaler = torch.cuda.amp.GradScaler()
-    summary_writer = None
     if utils.is_main_process():
-        summary_writer = SummaryWriter()
         stats_file = open(
             os.path.join(summary_writer.log_dir, "stats.txt"), "a", buffering=1
         )
-        print(" ".join(sys.argv))
+        logger.info(" ".join(sys.argv))
         print(" ".join(sys.argv), file=stats_file)
         with open(os.path.join(summary_writer.log_dir, "metadata.txt"), "a") as f:
             yaml.dump(args, f, allow_unicode=True)
@@ -231,7 +243,7 @@ def main():
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
-            print("=> loading checkpoint '{}'".format(args.resume))
+            logger.info("Loading checkpoint '{}'".format(args.resume))
             if args.gpu is None:
                 checkpoint = torch.load(args.resume)
             else:
@@ -242,19 +254,29 @@ def main():
             model.load_state_dict(checkpoint["state_dict"])
             optimizer.load_state_dict(checkpoint["optimizer"])
             scaler.load_state_dict(checkpoint["scaler"])
-            print(
-                "=> loaded checkpoint '{}' (epoch {})".format(
+            logger.info(
+                "Loaded checkpoint '{}' (epoch {})".format(
                     args.resume, checkpoint["epoch"]
                 )
             )
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            logger.info("No checkpoint found at '{}'".format(args.resume))
 
     # Data loading code
     traindir = os.path.join(args.data, "train")
-
+    normalize = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+    )
     # SimCLR augmentaion protocol
-    augmentations = utils.get_augmentations(strategy='pre-training')
+    augmentations = [
+        transforms.RandomResizedCrop(224, scale=(args.crop_min, 1.0)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([transforms.ColorJitter(0.8, 0.8, 0.8, 0.2)], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([simclr.loader.GaussianBlur([0.1, 2.0])], p=0.5),
+        transforms.ToTensor(),
+        normalize,
+    ]
 
     train_dataset = datasets.ImageFolder(
         traindir,
@@ -275,11 +297,18 @@ def main():
         drop_last=True,
     )
 
+    logger.info("Main components ready.")
+    logger.info(model)
+    logger.info(f"Optimizer: {optimizer}")
+    logger.info(f"Scaler: {scaler}")
+    logger.info("Starting SimCLR training.")
     for epoch in range(args.start_epoch, args.epochs):
         train_sampler.set_epoch(epoch)
 
         # train for one epoch
-        train(train_loader, model, optimizer, scaler, summary_writer, epoch, args)
+        train(
+            train_loader, model, optimizer, scaler, summary_writer, logger, epoch, args
+        )
 
         if utils.is_main_process():  # only the first GPU saves checkpoint
             filename = "checkpoint.pth.tar"
@@ -287,7 +316,7 @@ def main():
             if (epoch + 1) % args.save_checkpoint_every_epochs == 0:
                 filename = "checkpoint_%04d.pth.tar" % epoch
 
-            save_checkpoint(
+            utils.save_checkpoint(
                 {
                     "epoch": epoch + 1,
                     "arch": args.arch,
@@ -303,7 +332,7 @@ def main():
         summary_writer.close()
 
 
-def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
+def train(train_loader, model, optimizer, scaler, summary_writer, logger, epoch, args):
     batch_time = utils.AverageMeter("Time", ":6.3f")
     data_time = utils.AverageMeter("Data", ":6.3f")
     learning_rates = utils.AverageMeter("LR", ":.4e")
@@ -321,14 +350,14 @@ def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
     iters_per_epoch = len(train_loader)
 
     for i, (images, _) in enumerate(train_loader):
-        # global stop
+        # global step
         it = len(train_loader) * epoch + i
 
         # measure data loading time
         data_time.update(time.time() - end)
 
-        # adjust learning rate and momentum coefficient per iteration
-        lr = adjust_learning_rate(optimizer, epoch + i / iters_per_epoch, args)
+        # adjust learning rate
+        lr = utils.adjust_learning_rate(optimizer, epoch + i / iters_per_epoch, args)
         learning_rates.update(lr)
 
         if args.gpu is not None:
@@ -342,7 +371,8 @@ def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
         losses.update(loss.item(), images[0].size(0))
         if utils.is_main_process() and it % args.log_freq == 0:
             summary_writer.add_scalar("loss", loss.item(), it)
-            progress.display(i)
+            metrics = progress.display(i)
+            logger.info(metrics)
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -353,34 +383,6 @@ def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-
-
-def save_checkpoint(state, is_best, filename="checkpoint.pth.tar"):
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, "model_best.pth.tar")
-
-
-def adjust_learning_rate(optimizer, epoch, args):
-    """Decays the learning rate with half-cycle cosine after warmup"""
-    if epoch < args.warmup_epochs:
-        lr = args.lr * epoch / args.warmup_epochs
-    else:
-        lr = (
-            args.lr
-            * 0.5
-            * (
-                1.0
-                + math.cos(
-                    math.pi
-                    * (epoch - args.warmup_epochs)
-                    / (args.epochs - args.warmup_epochs)
-                )
-            )
-        )
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
-    return lr
 
 
 if __name__ == "__main__":
