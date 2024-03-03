@@ -8,3 +8,7 @@ class InvalidBackboneError(BaseSimCLRException):
 
 class InvalidDatasetSelection(BaseSimCLRException):
     """Raised when the choice of dataset is invalid."""
+
+
+class InvalidAugmentationStrategy(BaseSimCLRException):
+    """Raised when the choice of augmentations is invalid."""
