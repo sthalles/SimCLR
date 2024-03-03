@@ -25,6 +25,8 @@ import simclr.loader
 import simclr.optimizer
 import utils
 import vits
+import logging
+from logging.config import fileConfig
 
 
 torchvision_model_names = sorted(
@@ -170,8 +172,11 @@ def main():
     )
     cudnn.benchmark = True
 
+    fileConfig('simclr/logging/config.ini')
+    logger = logging.getLogger()
+
     # create model
-    print("=> creating model '{}'".format(args.arch))
+    logger.info("Creating model '{}'".format(args.arch))
     if args.arch.startswith("vit"):
         model = simclr.builder.SimCLR_ViT(
             partial(vits.__dict__[args.arch]),
@@ -299,11 +304,11 @@ def main():
 
 
 def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
-    batch_time = AverageMeter("Time", ":6.3f")
-    data_time = AverageMeter("Data", ":6.3f")
-    learning_rates = AverageMeter("LR", ":.4e")
-    losses = AverageMeter("Loss", ":.4e")
-    progress = ProgressMeter(
+    batch_time = utils.AverageMeter("Time", ":6.3f")
+    data_time = utils.AverageMeter("Data", ":6.3f")
+    learning_rates = utils.AverageMeter("LR", ":.4e")
+    losses = utils.AverageMeter("Loss", ":.4e")
+    progress = utils.ProgressMeter(
         len(train_loader),
         [batch_time, data_time, learning_rates, losses],
         prefix="Epoch: [{}]".format(epoch),
@@ -354,48 +359,6 @@ def save_checkpoint(state, is_best, filename="checkpoint.pth.tar"):
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, "model_best.pth.tar")
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self, name, fmt=":f"):
-        self.name = name
-        self.fmt = fmt
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-    def __str__(self):
-        fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
-        return fmtstr.format(**self.__dict__)
-
-
-class ProgressMeter(object):
-    def __init__(self, num_batches, meters, prefix=""):
-        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
-        self.meters = meters
-        self.prefix = prefix
-
-    def display(self, batch):
-        entries = [self.prefix + self.batch_fmtstr.format(batch)]
-        entries += [str(meter) for meter in self.meters]
-        print("\t".join(entries))
-
-    def _get_batch_fmtstr(self, num_batches):
-        num_digits = len(str(num_batches // 1))
-        fmt = "{:" + str(num_digits) + "d}"
-        return "[" + fmt + "/" + fmt.format(num_batches) + "]"
 
 
 def adjust_learning_rate(optimizer, epoch, args):
